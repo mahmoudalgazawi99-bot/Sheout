@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic';
 
 const CATEGORIES = ['Women', 'Men', 'Kids', 'Shoes', 'Sports', 'Accessories'];
 
-function firstImage(images: any): string | null {
+function firstImage(images) {
   if (!Array.isArray(images) || images.length === 0) return null;
   const first = images[0];
   if (typeof first === 'string') return first;
@@ -12,7 +12,7 @@ function firstImage(images: any): string | null {
   return null;
 }
 
-const money = (v: any) => `${Number(v).toFixed(2)} JD`;
+const money = (v) => `${Number(v).toFixed(2)} JD`;
 
 export default async function Home() {
   const [storesRes, productsRes] = await Promise.all([
@@ -28,8 +28,8 @@ export default async function Home() {
       .limit(8),
   ]);
 
-  const stores: any[] = storesRes.data ?? [];
-  const products: any[] = productsRes.data ?? [];
+  const stores = storesRes.data ?? [];
+  const products = productsRes.data ?? [];
   const hasError = storesRes.error || productsRes.error;
 
   const card = {
@@ -37,14 +37,14 @@ export default async function Home() {
     borderRadius: 12,
     overflow: 'hidden',
     background: '#fff',
-  } as const;
+  };
   const img = {
     width: '100%',
     aspectRatio: '1 / 1',
     objectFit: 'cover',
     background: '#f3f3f3',
     display: 'block',
-  } as const;
+  };
 
   return (
     <main style={{ maxWidth: 720, margin: '0 auto', padding: 16, fontFamily: 'sans-serif' }}>
