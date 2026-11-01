@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
+import CartLink from '@/components/CartLink';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,7 +51,10 @@ export default async function Home() {
 
   return (
     <main style={{ maxWidth: 720, margin: '0 auto', padding: 16, fontFamily: 'sans-serif' }}>
-      <h1 style={{ letterSpacing: 2, margin: '8px 0 12px' }}>SHEOUT</h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '8px 0 12px' }}>
+        <h1 style={{ letterSpacing: 2, margin: 0 }}>SHEOUT</h1>
+        <CartLink />
+      </div>
       <input
         placeholder="Search products, stores..."
         style={{ width: '100%', padding: 12, borderRadius: 10, border: '1px solid #ddd', boxSizing: 'border-box' }}
