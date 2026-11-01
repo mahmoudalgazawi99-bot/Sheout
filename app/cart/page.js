@@ -88,15 +88,14 @@ export default function CartPage() {
             <b>{money(total)}</b>
           </div>
           <div style={{ fontSize: 12, color: '#777', marginTop: 4 }}>
-            {storeIds.length} {storeIds.length === 1 ? 'store' : 'stores'} in this order
+            {storeIds.length} {storeIds.length === 1 ? 'store' : 'stores'} in this order · delivery fee added at checkout
           </div>
-          <button
-            type="button"
-            disabled
-            style={{ width: '100%', marginTop: 12, padding: 14, borderRadius: 10, border: 'none', background: '#bbb', color: '#fff', fontSize: 16 }}
+          <Link
+            href="/checkout"
+            style={{ display: 'block', textAlign: 'center', width: '100%', boxSizing: 'border-box', marginTop: 12, padding: 14, borderRadius: 10, background: '#111', color: '#fff', fontSize: 16, textDecoration: 'none' }}
           >
-            Checkout (coming next)
-          </button>
+            Checkout
+          </Link>
         </div>
       )}
     </main>
