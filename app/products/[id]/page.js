@@ -1,5 +1,7 @@
 import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
+import AddToCart from '@/components/AddToCart';
+import CartLink from '@/components/CartLink';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,16 +29,19 @@ export default async function ProductPage({ params }) {
     .maybeSingle();
 
   const wrap = { maxWidth: 720, margin: '0 auto', padding: 16, fontFamily: 'sans-serif' };
-  const backLink = (
-    <Link href="/" style={{ color: '#111', textDecoration: 'none', fontSize: 14 }}>
-      ← Back to SHEOUT
-    </Link>
+  const topBar = (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <Link href="/" style={{ color: '#111', textDecoration: 'none', fontSize: 14 }}>
+        ← Back to SHEOUT
+      </Link>
+      <CartLink />
+    </div>
   );
 
   if (!product || product.status !== 'active') {
     return (
       <main style={wrap}>
-        {backLink}
+        {topBar}
         <h2>Product not found</h2>
       </main>
     );
@@ -46,18 +51,11 @@ export default async function ProductPage({ params }) {
   const sizes = toList(product.sizes);
   const colors = toList(product.colors);
   const inStock = Number(product.quantity) > 0;
-
-  const chip = {
-    border: '1px solid #ddd',
-    borderRadius: 8,
-    padding: '6px 12px',
-    fontSize: 13,
-    background: '#fff',
-  };
+  const effectivePrice = product.sale_price || product.price;
 
   return (
     <main style={wrap}>
-      {backLink}
+      {topBar}
 
       <img
         src={images[0] || ''}
@@ -100,27 +98,19 @@ export default async function ProductPage({ params }) {
 
       {product.description && <p style={{ lineHeight: 1.6 }}>{product.description}</p>}
 
-      {sizes.length > 0 && (
-        <div style={{ marginTop: 12 }}>
-          <b>Sizes</b>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
-            {sizes.map((s) => (
-              <span key={s} style={chip}>{s}</span>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {colors.length > 0 && (
-        <div style={{ marginTop: 12 }}>
-          <b>Colors</b>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
-            {colors.map((c) => (
-              <span key={c} style={chip}>{c}</span>
-            ))}
-          </div>
-        </div>
-      )}
+      <AddToCart
+        product={{
+          id: product.id,
+          name: product.name,
+          price: effectivePrice,
+          image: images[0] || '',
+          storeId: product.stores ? product.stores.id : product.store_id,
+          storeName: product.stores ? product.stores.name : '',
+          quantity: product.quantity,
+        }}
+        sizes={sizes}
+        colors={colors}
+      />
     </main>
   );
 }
