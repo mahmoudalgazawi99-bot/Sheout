@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
 
 export const dynamic = 'force-dynamic';
@@ -66,13 +67,17 @@ export default async function Home() {
       <h2>Featured Stores</h2>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
         {stores.map((s) => (
-          <div key={s.id} style={card}>
+          <Link
+            key={s.id}
+            href={`/stores/${s.id}`}
+            style={{ ...card, textDecoration: 'none', color: 'inherit', display: 'block' }}
+          >
             <img src={s.logo_url || s.cover_url || ''} alt={s.name} style={img} />
             <div style={{ padding: 10 }}>
               <b>{s.name}</b>
               <div style={{ fontSize: 12, color: '#777' }}>{s.location}</div>
             </div>
-          </div>
+          </Link>
         ))}
       </div>
 
