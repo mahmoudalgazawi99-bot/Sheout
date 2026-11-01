@@ -51,6 +51,9 @@ export default async function StorePage({ params }) {
     borderRadius: 12,
     overflow: 'hidden',
     background: '#fff',
+    textDecoration: 'none',
+    color: 'inherit',
+    display: 'block',
   };
   const img = {
     width: '100%',
@@ -91,7 +94,7 @@ export default async function StorePage({ params }) {
       {products.length === 0 && <p style={{ color: '#777' }}>No products yet.</p>}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
         {products.map((p) => (
-          <div key={p.id} style={card}>
+          <Link key={p.id} href={`/products/${p.id}`} style={card}>
             <img src={firstImage(p.images) || ''} alt={p.name} style={img} />
             <div style={{ padding: 10 }}>
               <b style={{ fontSize: 14 }}>{p.name}</b>
@@ -106,7 +109,7 @@ export default async function StorePage({ params }) {
                 )}
               </div>
             </div>
-          </div>
+          </Link>
         ))}
       </div>
     </main>
