@@ -39,6 +39,7 @@ export default async function Home() {
     overflow: 'hidden',
     background: '#fff',
   };
+  const linkCard = { ...card, textDecoration: 'none', color: 'inherit', display: 'block' };
   const img = {
     width: '100%',
     aspectRatio: '1 / 1',
@@ -67,11 +68,7 @@ export default async function Home() {
       <h2>Featured Stores</h2>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
         {stores.map((s) => (
-          <Link
-            key={s.id}
-            href={`/stores/${s.id}`}
-            style={{ ...card, textDecoration: 'none', color: 'inherit', display: 'block' }}
-          >
+          <Link key={s.id} href={`/stores/${s.id}`} style={linkCard}>
             <img src={s.logo_url || s.cover_url || ''} alt={s.name} style={img} />
             <div style={{ padding: 10 }}>
               <b>{s.name}</b>
@@ -84,7 +81,7 @@ export default async function Home() {
       <h2 style={{ marginTop: 24 }}>New Arrivals</h2>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
         {products.map((p) => (
-          <div key={p.id} style={card}>
+          <Link key={p.id} href={`/products/${p.id}`} style={linkCard}>
             <img src={firstImage(p.images) || ''} alt={p.name} style={img} />
             <div style={{ padding: 10 }}>
               <div style={{ fontSize: 12, color: '#777' }}>{p.stores?.name}</div>
@@ -100,7 +97,7 @@ export default async function Home() {
                 )}
               </div>
             </div>
-          </div>
+          </Link>
         ))}
       </div>
     </main>
