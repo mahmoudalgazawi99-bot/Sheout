@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
 import CartLink from '@/components/CartLink';
+import { theme } from '@/lib/theme';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,6 +16,15 @@ function firstImage(images) {
 }
 
 const money = (v) => `${Number(v).toFixed(2)} JD`;
+
+function SectionTitle({ children }) {
+  return (
+    <div style={{ margin: '28px 0 14px' }}>
+      <h2 style={{ fontFamily: theme.serif, fontSize: 24, fontWeight: 600, margin: 0 }}>{children}</h2>
+      <div style={{ width: 36, height: 3, background: theme.gold, borderRadius: 2, marginTop: 6 }} />
+    </div>
+  );
+}
 
 export default async function Home() {
   const [storesRes, productsRes] = await Promise.all([
@@ -35,41 +45,64 @@ export default async function Home() {
   const hasError = storesRes.error || productsRes.error;
 
   const card = {
-    border: '1px solid #eee',
-    borderRadius: 12,
+    background: theme.card,
+    borderRadius: theme.radius,
     overflow: 'hidden',
-    background: '#fff',
+    boxShadow: theme.shadow,
+    border: `1px solid ${theme.line}`,
+    textDecoration: 'none',
+    color: 'inherit',
+    display: 'block',
   };
-  const linkCard = { ...card, textDecoration: 'none', color: 'inherit', display: 'block' };
   const img = {
     width: '100%',
-    aspectRatio: '1 / 1',
     objectFit: 'cover',
-    background: '#f3f3f3',
+    background: theme.goldSoft,
     display: 'block',
   };
 
   return (
-    <main style={{ maxWidth: 720, margin: '0 auto', padding: 16, fontFamily: 'sans-serif' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '8px 0 12px' }}>
-        <h1 style={{ letterSpacing: 2, margin: 0 }}>SHEOUT</h1>
+    <main style={{ maxWidth: 720, margin: '0 auto', padding: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '8px 0 4px' }}>
+        <div>
+          <h1 style={{ fontFamily: theme.serif, letterSpacing: 6, fontSize: 30, margin: 0, fontWeight: 600 }}>SHEOUT</h1>
+          <div style={{ fontSize: 12, color: theme.muted, marginTop: 2 }}>Fashion from Jordan's best stores</div>
+        </div>
         <CartLink />
       </div>
 
-      <form action="/search" method="GET">
+      <form action="/search" method="GET" style={{ marginTop: 16 }}>
         <input
           name="q"
           placeholder="Search products, stores..."
-          style={{ width: '100%', padding: 12, borderRadius: 10, border: '1px solid #ddd', boxSizing: 'border-box', fontSize: 16 }}
+          style={{
+            width: '100%',
+            padding: '14px 18px',
+            borderRadius: 999,
+            border: `1px solid ${theme.line}`,
+            background: theme.card,
+            boxShadow: theme.shadow,
+            fontSize: 16,
+            outline: 'none',
+          }}
         />
       </form>
 
-      <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '12px 0' }}>
+      <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '14px 0 4px' }}>
         {CATEGORIES.map((c) => (
           <Link
             key={c}
             href={`/search?category=${c}`}
-            style={{ background: '#111', color: '#fff', padding: '8px 14px', borderRadius: 20, fontSize: 13, whiteSpace: 'nowrap', textDecoration: 'none' }}
+            style={{
+              background: theme.ink,
+              color: theme.bg,
+              padding: '9px 18px',
+              borderRadius: 999,
+              fontSize: 13,
+              fontWeight: 500,
+              whiteSpace: 'nowrap',
+              textDecoration: 'none',
+            }}
           >
             {c}
           </Link>
@@ -78,32 +111,34 @@ export default async function Home() {
 
       {hasError && <p style={{ color: '#b00' }}>Could not load some data. Please try again.</p>}
 
-      <h2>Featured Stores</h2>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
+      <SectionTitle>Featured Stores</SectionTitle>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
         {stores.map((s) => (
-          <Link key={s.id} href={`/stores/${s.id}`} style={linkCard}>
-            <img src={s.logo_url || s.cover_url || ''} alt={s.name} style={img} />
-            <div style={{ padding: 10 }}>
-              <b>{s.name}</b>
-              <div style={{ fontSize: 12, color: '#777' }}>{s.location}</div>
+          <Link key={s.id} href={`/stores/${s.id}`} style={card}>
+            <img src={s.logo_url || s.cover_url || ''} alt={s.name} style={{ ...img, aspectRatio: '1 / 1' }} />
+            <div style={{ padding: '12px 14px' }}>
+              <b style={{ fontFamily: theme.serif, fontSize: 16 }}>{s.name}</b>
+              <div style={{ fontSize: 12, color: theme.muted, marginTop: 2 }}>{s.location}</div>
             </div>
           </Link>
         ))}
       </div>
 
-      <h2 style={{ marginTop: 24 }}>New Arrivals</h2>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
+      <SectionTitle>New Arrivals</SectionTitle>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
         {products.map((p) => (
-          <Link key={p.id} href={`/products/${p.id}`} style={linkCard}>
-            <img src={firstImage(p.images) || ''} alt={p.name} style={img} />
-            <div style={{ padding: 10 }}>
-              <div style={{ fontSize: 12, color: '#777' }}>{p.stores?.name}</div>
-              <b style={{ fontSize: 14 }}>{p.name}</b>
-              <div style={{ marginTop: 4 }}>
+          <Link key={p.id} href={`/products/${p.id}`} style={card}>
+            <img src={firstImage(p.images) || ''} alt={p.name} style={{ ...img, aspectRatio: '4 / 5' }} />
+            <div style={{ padding: '12px 14px' }}>
+              <div style={{ fontSize: 11, color: theme.muted, textTransform: 'uppercase', letterSpacing: 1 }}>
+                {p.stores?.name}
+              </div>
+              <b style={{ fontSize: 14, display: 'block', marginTop: 2 }}>{p.name}</b>
+              <div style={{ marginTop: 6 }}>
                 {p.sale_price ? (
                   <>
-                    <b>{money(p.sale_price)}</b>{' '}
-                    <s style={{ color: '#999', fontSize: 12 }}>{money(p.price)}</s>
+                    <b style={{ color: theme.gold }}>{money(p.sale_price)}</b>{' '}
+                    <s style={{ color: theme.muted, fontSize: 12 }}>{money(p.price)}</s>
                   </>
                 ) : (
                   <b>{money(p.price)}</b>
