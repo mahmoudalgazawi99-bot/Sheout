@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { theme } from '@/lib/theme';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,13 +15,13 @@ export default async function OrderPage({ params }) {
     .eq('id', id)
     .maybeSingle();
 
-  const wrap = { maxWidth: 720, margin: '0 auto', padding: 16, fontFamily: 'sans-serif' };
+  const wrap = { maxWidth: 720, margin: '0 auto', padding: 16 };
 
   if (!order) {
     return (
       <main style={wrap}>
-        <Link href="/" style={{ color: '#111', textDecoration: 'none', fontSize: 14 }}>← Back to SHEOUT</Link>
-        <h2>Order not found</h2>
+        <Link href="/" style={{ color: theme.ink, textDecoration: 'none', fontSize: 14 }}>← Back to SHEOUT</Link>
+        <h2 style={{ fontFamily: theme.serif }}>Order not found</h2>
       </main>
     );
   }
@@ -34,12 +35,37 @@ export default async function OrderPage({ params }) {
 
   return (
     <main style={wrap}>
-      <h1 style={{ marginBottom: 4 }}>Thank you!</h1>
-      <p style={{ marginTop: 0, color: '#555' }}>
-        Your order <b>#{shortId}</b> has been placed. Payment on delivery.
-      </p>
+      <div style={{ textAlign: 'center', margin: '18px 0 20px' }}>
+        <div
+          style={{
+            width: 56,
+            height: 56,
+            borderRadius: '50%',
+            background: theme.ink,
+            color: theme.gold,
+            fontSize: 28,
+            lineHeight: '56px',
+            margin: '0 auto 12px',
+          }}
+        >
+          ✓
+        </div>
+        <h1 style={{ fontFamily: theme.serif, fontSize: 30, fontWeight: 600, margin: 0 }}>Thank you!</h1>
+        <p style={{ color: theme.muted, margin: '8px 0 0' }}>
+          Your order <b style={{ color: theme.gold }}>#{shortId}</b> has been placed. Payment on delivery.
+        </p>
+      </div>
 
-      <div style={{ fontSize: 14, lineHeight: 1.8, margin: '12px 0' }}>
+      <div
+        style={{
+          fontSize: 14,
+          lineHeight: 1.9,
+          background: theme.goldSoft,
+          borderRadius: theme.radius,
+          padding: '12px 16px',
+          marginBottom: 16,
+        }}
+      >
         <div>Name: {order.customers?.name}</div>
         <div>Phone: {order.customers?.phone}</div>
         <div>Address: {order.address}</div>
@@ -48,32 +74,58 @@ export default async function OrderPage({ params }) {
       </div>
 
       {(subOrders ?? []).map((so) => (
-        <section key={so.id} style={{ border: '1px solid #eee', borderRadius: 12, padding: 12, marginBottom: 12 }}>
-          <h3 style={{ margin: '0 0 8px' }}>{so.stores?.name}</h3>
+        <section
+          key={so.id}
+          style={{
+            background: theme.card,
+            border: `1px solid ${theme.line}`,
+            borderRadius: theme.radius,
+            boxShadow: theme.shadow,
+            padding: 14,
+            marginBottom: 14,
+          }}
+        >
+          <h3 style={{ fontFamily: theme.serif, fontSize: 18, margin: '0 0 8px' }}>{so.stores?.name}</h3>
           {(so.order_items ?? []).map((it, idx) => (
-            <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, padding: '6px 0', borderTop: '1px solid #f3f3f3' }}>
+            <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, padding: '8px 0', borderTop: `1px solid ${theme.line}` }}>
               <div>
                 {it.products?.name} × {it.quantity}
-                <div style={{ fontSize: 12, color: '#777' }}>
+                <div style={{ fontSize: 12, color: theme.muted }}>
                   {[it.size, it.color].filter(Boolean).join(' / ')}
                 </div>
               </div>
               <b>{money(it.price * it.quantity)}</b>
             </div>
           ))}
-          <div style={{ textAlign: 'right', marginTop: 6 }}>
-            Store subtotal: <b>{money(so.subtotal)}</b>
+          <div style={{ textAlign: 'right', marginTop: 8, fontSize: 14 }}>
+            Store subtotal: <b style={{ color: theme.gold }}>{money(so.subtotal)}</b>
           </div>
         </section>
       ))}
 
-      <div style={{ borderTop: '2px solid #111', paddingTop: 12, lineHeight: 1.8 }}>
+      <div style={{ borderTop: `2px solid ${theme.ink}`, paddingTop: 14, lineHeight: 1.9 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Items</span><span>{money(order.subtotal)}</span></div>
         <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Delivery</span><span>{money(order.delivery_fee)}</span></div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18 }}><b>Total</b><b>{money(order.total)}</b></div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 20 }}>
+          <b style={{ fontFamily: theme.serif }}>Total</b>
+          <b>{money(order.total)}</b>
+        </div>
       </div>
 
-      <Link href="/" style={{ display: 'block', textAlign: 'center', marginTop: 20, color: '#111' }}>
+      <Link
+        href="/"
+        style={{
+          display: 'block',
+          textAlign: 'center',
+          marginTop: 22,
+          padding: 16,
+          borderRadius: 999,
+          background: theme.ink,
+          color: theme.gold,
+          fontWeight: 600,
+          textDecoration: 'none',
+        }}
+      >
         Continue shopping
       </Link>
     </main>
