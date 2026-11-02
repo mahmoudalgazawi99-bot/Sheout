@@ -77,4 +77,58 @@ export default function CartPage() {
                   <div style={{ fontSize: 12, color: theme.muted }}>
                     {[i.size, i.color].filter(Boolean).join(' / ')}
                   </div>
-                  
+                  <div style={{ marginTop: 4, fontWeight: 600 }}>{money(i.price)}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
+                    <button type="button" style={qtyBtn} onClick={() => setQty(i.key, i.qty - 1)}>-</button>
+                    <span>{i.qty}</span>
+                    <button type="button" style={qtyBtn} onClick={() => setQty(i.key, i.qty + 1)}>+</button>
+                    <button
+                      type="button"
+                      onClick={() => removeItem(i.key)}
+                      style={{ marginLeft: 'auto', border: 'none', background: 'none', color: '#b00', fontSize: 13 }}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+            <div style={{ textAlign: 'right', marginTop: 8, fontSize: 14 }}>
+              Store subtotal: <b style={{ color: theme.gold }}>{money(subtotal)}</b>
+            </div>
+          </section>
+        );
+      })}
+
+      {items.length > 0 && (
+        <div style={{ borderTop: `2px solid ${theme.ink}`, paddingTop: 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 20 }}>
+            <b style={{ fontFamily: theme.serif }}>Total</b>
+            <b>{money(total)}</b>
+          </div>
+          <div style={{ fontSize: 12, color: theme.muted, marginTop: 4 }}>
+            {storeIds.length} {storeIds.length === 1 ? 'store' : 'stores'} in this order · delivery fee added at checkout
+          </div>
+          <Link
+            href="/checkout"
+            style={{
+              display: 'block',
+              textAlign: 'center',
+              marginTop: 14,
+              padding: 16,
+              borderRadius: 999,
+              background: theme.ink,
+              color: theme.gold,
+              fontSize: 16,
+              fontWeight: 600,
+              letterSpacing: 0.5,
+              textDecoration: 'none',
+            }}
+          >
+            Checkout
+          </Link>
+        </div>
+      )}
+    </main>
+  );
+}
