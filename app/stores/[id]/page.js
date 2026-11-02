@@ -1,5 +1,7 @@
 import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
+import CartLink from '@/components/CartLink';
+import { theme } from '@/lib/theme';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,17 +24,20 @@ export default async function StorePage({ params }) {
     .eq('id', id)
     .maybeSingle();
 
-  const backLink = (
-    <Link href="/" style={{ color: '#111', textDecoration: 'none', fontSize: 14 }}>
-      ← Back to SHEOUT
-    </Link>
+  const topBar = (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <Link href="/" style={{ color: theme.ink, textDecoration: 'none', fontSize: 14 }}>
+        ← Back to SHEOUT
+      </Link>
+      <CartLink />
+    </div>
   );
 
   if (!store) {
     return (
-      <main style={{ maxWidth: 720, margin: '0 auto', padding: 16, fontFamily: 'sans-serif' }}>
-        {backLink}
-        <h2>Store not found</h2>
+      <main style={{ maxWidth: 720, margin: '0 auto', padding: 16 }}>
+        {topBar}
+        <h2 style={{ fontFamily: theme.serif }}>Store not found</h2>
       </main>
     );
   }
@@ -47,62 +52,72 @@ export default async function StorePage({ params }) {
   const products = productsData ?? [];
 
   const card = {
-    border: '1px solid #eee',
-    borderRadius: 12,
+    background: theme.card,
+    borderRadius: theme.radius,
     overflow: 'hidden',
-    background: '#fff',
+    boxShadow: theme.shadow,
+    border: `1px solid ${theme.line}`,
     textDecoration: 'none',
     color: 'inherit',
     display: 'block',
   };
   const img = {
     width: '100%',
-    aspectRatio: '1 / 1',
+    aspectRatio: '4 / 5',
     objectFit: 'cover',
-    background: '#f3f3f3',
+    background: theme.goldSoft,
     display: 'block',
   };
 
   return (
-    <main style={{ maxWidth: 720, margin: '0 auto', padding: 16, fontFamily: 'sans-serif' }}>
-      {backLink}
+    <main style={{ maxWidth: 720, margin: '0 auto', padding: 16 }}>
+      {topBar}
 
       <img
         src={store.cover_url || ''}
         alt={store.name}
-        style={{ width: '100%', height: 160, objectFit: 'cover', borderRadius: 12, background: '#f3f3f3', display: 'block', marginTop: 12 }}
+        style={{ width: '100%', height: 200, objectFit: 'cover', borderRadius: theme.radius, background: theme.goldSoft, display: 'block', marginTop: 14, boxShadow: theme.shadow }}
       />
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 16 }}>
         {store.logo_url && (
-          <img src={store.logo_url} alt="" style={{ width: 56, height: 56, borderRadius: '50%', objectFit: 'cover', background: '#f3f3f3' }} />
+          <img
+            src={store.logo_url}
+            alt=""
+            style={{ width: 60, height: 60, borderRadius: '50%', objectFit: 'cover', background: theme.goldSoft, border: `2px solid ${theme.gold}` }}
+          />
         )}
         <div>
-          <h1 style={{ margin: 0 }}>{store.name}</h1>
-          <div style={{ fontSize: 13, color: '#777' }}>{store.location}</div>
+          <h1 style={{ fontFamily: theme.serif, fontSize: 26, fontWeight: 600, margin: 0 }}>{store.name}</h1>
+          <div style={{ fontSize: 13, color: theme.muted, marginTop: 2 }}>{store.location}</div>
         </div>
       </div>
 
-      {store.description && <p style={{ lineHeight: 1.6 }}>{store.description}</p>}
+      {store.description && <p style={{ lineHeight: 1.7, color: '#3a362f' }}>{store.description}</p>}
 
-      <div style={{ fontSize: 13, color: '#555', lineHeight: 1.8 }}>
-        {store.working_hours && <div>Hours: {store.working_hours}</div>}
-        {store.phone && <div>Phone: {store.phone}</div>}
+      {(store.working_hours || store.phone) && (
+        <div style={{ fontSize: 13, color: theme.muted, lineHeight: 1.9, background: theme.goldSoft, borderRadius: 12, padding: '10px 14px' }}>
+          {store.working_hours && <div>Hours: {store.working_hours}</div>}
+          {store.phone && <div>Phone: {store.phone}</div>}
+        </div>
+      )}
+
+      <div style={{ margin: '26px 0 14px' }}>
+        <h2 style={{ fontFamily: theme.serif, fontSize: 22, fontWeight: 600, margin: 0 }}>Products ({products.length})</h2>
+        <div style={{ width: 36, height: 3, background: theme.gold, borderRadius: 2, marginTop: 6 }} />
       </div>
-
-      <h2 style={{ marginTop: 24 }}>Products ({products.length})</h2>
-      {products.length === 0 && <p style={{ color: '#777' }}>No products yet.</p>}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
+      {products.length === 0 && <p style={{ color: theme.muted }}>No products yet.</p>}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
         {products.map((p) => (
           <Link key={p.id} href={`/products/${p.id}`} style={card}>
             <img src={firstImage(p.images) || ''} alt={p.name} style={img} />
-            <div style={{ padding: 10 }}>
+            <div style={{ padding: '12px 14px' }}>
               <b style={{ fontSize: 14 }}>{p.name}</b>
-              <div style={{ marginTop: 4 }}>
+              <div style={{ marginTop: 6 }}>
                 {p.sale_price ? (
                   <>
-                    <b>{money(p.sale_price)}</b>{' '}
-                    <s style={{ color: '#999', fontSize: 12 }}>{money(p.price)}</s>
+                    <b style={{ color: theme.gold }}>{money(p.sale_price)}</b>{' '}
+                    <s style={{ color: theme.muted, fontSize: 12 }}>{money(p.price)}</s>
                   </>
                 ) : (
                   <b>{money(p.price)}</b>
