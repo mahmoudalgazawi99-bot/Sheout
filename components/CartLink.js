@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { getCart } from '@/lib/cart';
+import { theme } from '@/lib/theme';
 
 export default function CartLink() {
   const [count, setCount] = useState(0);
@@ -21,7 +22,17 @@ export default function CartLink() {
   return (
     <Link
       href="/cart"
-      style={{ background: '#111', color: '#fff', padding: '8px 14px', borderRadius: 20, fontSize: 13, textDecoration: 'none', whiteSpace: 'nowrap' }}
+      style={{
+        background: theme.ink,
+        color: theme.gold,
+        padding: '9px 16px',
+        borderRadius: 999,
+        fontSize: 13,
+        fontWeight: 600,
+        letterSpacing: 0.5,
+        textDecoration: 'none',
+        whiteSpace: 'nowrap',
+      }}
     >
       Cart ({count})
     </Link>
