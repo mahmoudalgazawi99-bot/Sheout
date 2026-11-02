@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
 import CartLink from '@/components/CartLink';
+import { theme } from '@/lib/theme';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,54 +49,71 @@ export default async function SearchPage({ searchParams }) {
   const products = productsData ?? [];
 
   const card = {
-    border: '1px solid #eee',
-    borderRadius: 12,
+    background: theme.card,
+    borderRadius: theme.radius,
     overflow: 'hidden',
-    background: '#fff',
+    boxShadow: theme.shadow,
+    border: `1px solid ${theme.line}`,
     textDecoration: 'none',
     color: 'inherit',
     display: 'block',
   };
   const img = {
     width: '100%',
-    aspectRatio: '1 / 1',
     objectFit: 'cover',
-    background: '#f3f3f3',
+    background: theme.goldSoft,
     display: 'block',
   };
 
   const title = category ? category : q ? `Results for "${q}"` : 'All products';
 
+  const heading = (text, size) => (
+    <div style={{ margin: '22px 0 12px' }}>
+      <h2 style={{ fontFamily: theme.serif, fontSize: size, fontWeight: 600, margin: 0 }}>{text}</h2>
+      <div style={{ width: 36, height: 3, background: theme.gold, borderRadius: 2, marginTop: 6 }} />
+    </div>
+  );
+
   return (
-    <main style={{ maxWidth: 720, margin: '0 auto', padding: 16, fontFamily: 'sans-serif' }}>
+    <main style={{ maxWidth: 720, margin: '0 auto', padding: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Link href="/" style={{ color: '#111', textDecoration: 'none', fontSize: 14 }}>
+        <Link href="/" style={{ color: theme.ink, textDecoration: 'none', fontSize: 14 }}>
           ← Back to SHEOUT
         </Link>
         <CartLink />
       </div>
 
-      <form action="/search" method="GET" style={{ marginTop: 12 }}>
+      <form action="/search" method="GET" style={{ marginTop: 14 }}>
         <input
           name="q"
           defaultValue={q}
           placeholder="Search products, stores..."
-          style={{ width: '100%', padding: 12, borderRadius: 10, border: '1px solid #ddd', boxSizing: 'border-box', fontSize: 16 }}
+          style={{
+            width: '100%',
+            padding: '14px 18px',
+            borderRadius: 999,
+            border: `1px solid ${theme.line}`,
+            background: theme.card,
+            boxShadow: theme.shadow,
+            fontSize: 16,
+            outline: 'none',
+          }}
         />
       </form>
 
-      <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '12px 0' }}>
+      <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '14px 0 4px' }}>
         {CATEGORIES.map((c) => (
           <Link
             key={c}
             href={`/search?category=${c}`}
             style={{
-              background: c === category ? '#111' : '#fff',
-              color: c === category ? '#fff' : '#111',
-              border: '1px solid #111',
-              padding: '8px 14px',
-              borderRadius: 20,
+              background: c === category ? theme.ink : theme.card,
+              color: c === category ? theme.gold : theme.ink,
+              border: `1px solid ${c === category ? theme.ink : theme.line}`,
+              padding: '9px 18px',
+              borderRadius: 999,
               fontSize: 13,
+              fontWeight: 500,
               whiteSpace: 'nowrap',
               textDecoration: 'none',
             }}
@@ -105,18 +123,18 @@ export default async function SearchPage({ searchParams }) {
         ))}
       </div>
 
-      <h2 style={{ marginBottom: 8 }}>{title}</h2>
+      {heading(title, 24)}
 
       {stores.length > 0 && (
         <>
-          <h3>Stores</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
+          <h3 style={{ fontFamily: theme.serif, margin: '0 0 10px' }}>Stores</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
             {stores.map((s) => (
               <Link key={s.id} href={`/stores/${s.id}`} style={card}>
-                <img src={s.logo_url || s.cover_url || ''} alt={s.name} style={img} />
-                <div style={{ padding: 10 }}>
-                  <b>{s.name}</b>
-                  <div style={{ fontSize: 12, color: '#777' }}>{s.location}</div>
+                <img src={s.logo_url || s.cover_url || ''} alt={s.name} style={{ ...img, aspectRatio: '1 / 1' }} />
+                <div style={{ padding: '12px 14px' }}>
+                  <b style={{ fontFamily: theme.serif, fontSize: 16 }}>{s.name}</b>
+                  <div style={{ fontSize: 12, color: theme.muted, marginTop: 2 }}>{s.location}</div>
                 </div>
               </Link>
             ))}
@@ -124,22 +142,24 @@ export default async function SearchPage({ searchParams }) {
         </>
       )}
 
-      <h3 style={{ marginTop: 20 }}>Products ({products.length})</h3>
+      <h3 style={{ fontFamily: theme.serif, margin: '22px 0 10px' }}>Products ({products.length})</h3>
       {products.length === 0 && stores.length === 0 && (
-        <p style={{ color: '#777' }}>No results found. Try a different search or category.</p>
+        <p style={{ color: theme.muted }}>No results found. Try a different search or category.</p>
       )}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
         {products.map((p) => (
           <Link key={p.id} href={`/products/${p.id}`} style={card}>
-            <img src={firstImage(p.images) || ''} alt={p.name} style={img} />
-            <div style={{ padding: 10 }}>
-              <div style={{ fontSize: 12, color: '#777' }}>{p.stores?.name}</div>
-              <b style={{ fontSize: 14 }}>{p.name}</b>
-              <div style={{ marginTop: 4 }}>
+            <img src={firstImage(p.images) || ''} alt={p.name} style={{ ...img, aspectRatio: '4 / 5' }} />
+            <div style={{ padding: '12px 14px' }}>
+              <div style={{ fontSize: 11, color: theme.muted, textTransform: 'uppercase', letterSpacing: 1 }}>
+                {p.stores?.name}
+              </div>
+              <b style={{ fontSize: 14, display: 'block', marginTop: 2 }}>{p.name}</b>
+              <div style={{ marginTop: 6 }}>
                 {p.sale_price ? (
                   <>
-                    <b>{money(p.sale_price)}</b>{' '}
-                    <s style={{ color: '#999', fontSize: 12 }}>{money(p.price)}</s>
+                    <b style={{ color: theme.gold }}>{money(p.sale_price)}</b>{' '}
+                    <s style={{ color: theme.muted, fontSize: 12 }}>{money(p.price)}</s>
                   </>
                 ) : (
                   <b>{money(p.price)}</b>
