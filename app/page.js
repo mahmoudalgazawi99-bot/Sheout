@@ -55,15 +55,24 @@ export default async function Home() {
         <h1 style={{ letterSpacing: 2, margin: 0 }}>SHEOUT</h1>
         <CartLink />
       </div>
-      <input
-        placeholder="Search products, stores..."
-        style={{ width: '100%', padding: 12, borderRadius: 10, border: '1px solid #ddd', boxSizing: 'border-box' }}
-      />
+
+      <form action="/search" method="GET">
+        <input
+          name="q"
+          placeholder="Search products, stores..."
+          style={{ width: '100%', padding: 12, borderRadius: 10, border: '1px solid #ddd', boxSizing: 'border-box', fontSize: 16 }}
+        />
+      </form>
+
       <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '12px 0' }}>
         {CATEGORIES.map((c) => (
-          <span key={c} style={{ background: '#111', color: '#fff', padding: '8px 14px', borderRadius: 20, fontSize: 13, whiteSpace: 'nowrap' }}>
+          <Link
+            key={c}
+            href={`/search?category=${c}`}
+            style={{ background: '#111', color: '#fff', padding: '8px 14px', borderRadius: 20, fontSize: 13, whiteSpace: 'nowrap', textDecoration: 'none' }}
+          >
             {c}
-          </span>
+          </Link>
         ))}
       </div>
 
