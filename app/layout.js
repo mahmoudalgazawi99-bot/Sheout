@@ -1,3 +1,5 @@
+import './globals.css';
+
 export const metadata = {
   title: 'Sheout',
   description: 'Fashion Marketplace - Jordan',
