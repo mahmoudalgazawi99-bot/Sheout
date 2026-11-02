@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { addToCart } from '@/lib/cart';
+import { theme } from '@/lib/theme';
 
 export default function AddToCart({ product, sizes, colors }) {
   const [size, setSize] = useState('');
@@ -13,13 +14,16 @@ export default function AddToCart({ product, sizes, colors }) {
   const inStock = Number(product.quantity) > 0;
 
   const chip = (active) => ({
-    border: active ? '2px solid #111' : '1px solid #ddd',
-    borderRadius: 8,
-    padding: '6px 12px',
+    border: active ? `2px solid ${theme.ink}` : `1px solid ${theme.line}`,
+    borderRadius: 999,
+    padding: active ? '7px 15px' : '8px 16px',
     fontSize: 13,
-    background: '#fff',
+    background: active ? theme.ink : theme.card,
+    color: active ? theme.bg : theme.ink,
     cursor: 'pointer',
   });
+
+  const label = { fontFamily: theme.serif, fontSize: 16, fontWeight: 600 };
 
   function handleAdd() {
     if (sizes.length > 0 && !size) {
@@ -49,9 +53,9 @@ export default function AddToCart({ product, sizes, colors }) {
   return (
     <div style={{ marginTop: 12 }}>
       {sizes.length > 0 && (
-        <div style={{ marginTop: 12 }}>
-          <b>Sizes</b>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
+        <div style={{ marginTop: 16 }}>
+          <div style={label}>Sizes</div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
             {sizes.map((s) => (
               <button key={s} type="button" onClick={() => { setSize(s); setAdded(false); }} style={chip(size === s)}>
                 {s}
@@ -62,9 +66,9 @@ export default function AddToCart({ product, sizes, colors }) {
       )}
 
       {colors.length > 0 && (
-        <div style={{ marginTop: 12 }}>
-          <b>Colors</b>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
+        <div style={{ marginTop: 16 }}>
+          <div style={label}>Colors</div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
             {colors.map((c) => (
               <button key={c} type="button" onClick={() => { setColor(c); setAdded(false); }} style={chip(color === c)}>
                 {c}
@@ -82,13 +86,15 @@ export default function AddToCart({ product, sizes, colors }) {
         disabled={!inStock}
         style={{
           width: '100%',
-          marginTop: 16,
-          padding: 14,
-          borderRadius: 10,
+          marginTop: 20,
+          padding: 16,
+          borderRadius: 999,
           border: 'none',
-          background: inStock ? '#111' : '#bbb',
-          color: '#fff',
+          background: inStock ? theme.ink : '#bbb',
+          color: inStock ? theme.gold : '#fff',
           fontSize: 16,
+          fontWeight: 600,
+          letterSpacing: 0.5,
         }}
       >
         {inStock ? 'Add to cart' : 'Out of stock'}
@@ -96,7 +102,8 @@ export default function AddToCart({ product, sizes, colors }) {
 
       {added && (
         <p style={{ fontSize: 14 }}>
-          Added to cart. <Link href="/cart" style={{ color: '#111' }}>View cart</Link>
+          Added to cart.{' '}
+          <Link href="/cart" style={{ color: theme.gold, fontWeight: 600 }}>View cart</Link>
         </p>
       )}
     </div>
