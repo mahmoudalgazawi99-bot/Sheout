@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
 import AddToCart from '@/components/AddToCart';
 import CartLink from '@/components/CartLink';
+import { theme } from '@/lib/theme';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,10 +29,10 @@ export default async function ProductPage({ params }) {
     .eq('id', id)
     .maybeSingle();
 
-  const wrap = { maxWidth: 720, margin: '0 auto', padding: 16, fontFamily: 'sans-serif' };
+  const wrap = { maxWidth: 720, margin: '0 auto', padding: 16 };
   const topBar = (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-      <Link href="/" style={{ color: '#111', textDecoration: 'none', fontSize: 14 }}>
+      <Link href="/" style={{ color: theme.ink, textDecoration: 'none', fontSize: 14 }}>
         ← Back to SHEOUT
       </Link>
       <CartLink />
@@ -42,7 +43,7 @@ export default async function ProductPage({ params }) {
     return (
       <main style={wrap}>
         {topBar}
-        <h2>Product not found</h2>
+        <h2 style={{ fontFamily: theme.serif }}>Product not found</h2>
       </main>
     );
   }
@@ -60,32 +61,41 @@ export default async function ProductPage({ params }) {
       <img
         src={images[0] || ''}
         alt={product.name}
-        style={{ width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', borderRadius: 12, background: '#f3f3f3', display: 'block', marginTop: 12 }}
+        style={{
+          width: '100%',
+          aspectRatio: '4 / 5',
+          objectFit: 'cover',
+          borderRadius: theme.radius,
+          background: theme.goldSoft,
+          display: 'block',
+          marginTop: 14,
+          boxShadow: theme.shadow,
+        }}
       />
 
       {images.length > 1 && (
         <div style={{ display: 'flex', gap: 8, overflowX: 'auto', marginTop: 8 }}>
           {images.map((u, i) => (
-            <img key={i} src={u} alt="" style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 8, background: '#f3f3f3', flex: '0 0 auto' }} />
+            <img key={i} src={u} alt="" style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 12, background: theme.goldSoft, flex: '0 0 auto' }} />
           ))}
         </div>
       )}
 
       {product.stores && (
-        <div style={{ marginTop: 16, fontSize: 13 }}>
-          <Link href={`/stores/${product.stores.id}`} style={{ color: '#777', textDecoration: 'none' }}>
+        <div style={{ marginTop: 18, fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.5 }}>
+          <Link href={`/stores/${product.stores.id}`} style={{ color: theme.gold, textDecoration: 'none', fontWeight: 600 }}>
             {product.stores.name}
           </Link>
         </div>
       )}
 
-      <h1 style={{ margin: '4px 0 8px' }}>{product.name}</h1>
+      <h1 style={{ fontFamily: theme.serif, fontSize: 28, fontWeight: 600, margin: '4px 0 8px' }}>{product.name}</h1>
 
-      <div style={{ fontSize: 20 }}>
+      <div style={{ fontSize: 22 }}>
         {product.sale_price ? (
           <>
-            <b>{money(product.sale_price)}</b>{' '}
-            <s style={{ color: '#999', fontSize: 14 }}>{money(product.price)}</s>
+            <b style={{ color: theme.gold }}>{money(product.sale_price)}</b>{' '}
+            <s style={{ color: theme.muted, fontSize: 15 }}>{money(product.price)}</s>
           </>
         ) : (
           <b>{money(product.price)}</b>
@@ -96,7 +106,9 @@ export default async function ProductPage({ params }) {
         {inStock ? 'In stock' : 'Out of stock'}
       </div>
 
-      {product.description && <p style={{ lineHeight: 1.6 }}>{product.description}</p>}
+      {product.description && (
+        <p style={{ lineHeight: 1.7, color: '#3a362f', marginTop: 14 }}>{product.description}</p>
+      )}
 
       <AddToCart
         product={{
