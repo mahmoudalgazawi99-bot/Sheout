@@ -4,8 +4,11 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { getCart } from '@/lib/cart';
 import { theme } from '@/lib/theme';
+import { useLang } from '@/components/LangProvider';
+import { t } from '@/lib/i18n';
 
 export default function CartLink() {
+  const lang = useLang();
   const [count, setCount] = useState(0);
 
   useEffect(() => {
@@ -29,12 +32,12 @@ export default function CartLink() {
         borderRadius: 999,
         fontSize: 13,
         fontWeight: 600,
-        letterSpacing: 0.5,
+        letterSpacing: lang === 'en' ? 0.5 : 0,
         textDecoration: 'none',
         whiteSpace: 'nowrap',
       }}
     >
-      Cart ({count})
+      {t(lang, 'cart')} ({count})
     </Link>
   );
 }
