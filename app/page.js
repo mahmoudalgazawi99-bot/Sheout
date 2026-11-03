@@ -1,6 +1,9 @@
 import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
 import CartLink from '@/components/CartLink';
+import LangToggle from '@/components/LangToggle';
+import { getLang } from '@/lib/serverlang';
+import { t, money, pick } from '@/lib/i18n';
 import { theme } from '@/lib/theme';
 
 export const dynamic = 'force-dynamic';
@@ -15,8 +18,6 @@ function firstImage(images) {
   return null;
 }
 
-const money = (v) => `${Number(v).toFixed(2)} JD`;
-
 function SectionTitle({ children }) {
   return (
     <div style={{ margin: '28px 0 14px' }}>
@@ -27,14 +28,16 @@ function SectionTitle({ children }) {
 }
 
 export default async function Home() {
+  const lang = await getLang();
+
   const [storesRes, productsRes] = await Promise.all([
     supabase
       .from('stores')
-      .select('id, name, logo_url, cover_url, location')
+      .select('id, name, name_ar, logo_url, cover_url, location, location_ar')
       .limit(6),
     supabase
       .from('products')
-      .select('id, name, price, sale_price, images, stores(name)')
+      .select('id, name, name_ar, price, sale_price, images, stores(name, name_ar)')
       .eq('status', 'active')
       .order('created_at', { ascending: false })
       .limit(8),
@@ -66,15 +69,18 @@ export default async function Home() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '8px 0 4px' }}>
         <div>
           <h1 style={{ fontFamily: theme.serif, letterSpacing: 6, fontSize: 30, margin: 0, fontWeight: 600 }}>SHEOUT</h1>
-          <div style={{ fontSize: 12, color: theme.muted, marginTop: 2 }}>Fashion from Jordan's best stores</div>
+          <div style={{ fontSize: 12, color: theme.muted, marginTop: 2 }}>{t(lang, 'tagline')}</div>
         </div>
-        <CartLink />
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <LangToggle />
+          <CartLink />
+        </div>
       </div>
 
       <form action="/search" method="GET" style={{ marginTop: 16 }}>
         <input
           name="q"
-          placeholder="Search products, stores..."
+          placeholder={t(lang, 'search')}
           style={{
             width: '100%',
             padding: '14px 18px',
@@ -104,44 +110,53 @@ export default async function Home() {
               textDecoration: 'none',
             }}
           >
-            {c}
+            {t(lang, c)}
           </Link>
         ))}
       </div>
 
-      {hasError && <p style={{ color: '#b00' }}>Could not load some data. Please try again.</p>}
+      {hasError && <p style={{ color: '#b00' }}>{t(lang, 'loadError')}</p>}
 
-      <SectionTitle>Featured Stores</SectionTitle>
+      <SectionTitle>{t(lang, 'featuredStores')}</SectionTitle>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
         {stores.map((s) => (
           <Link key={s.id} href={`/stores/${s.id}`} style={card}>
-            <img src={s.logo_url || s.cover_url || ''} alt={s.name} style={{ ...img, aspectRatio: '1 / 1' }} />
+            <img src={s.logo_url || s.cover_url || ''} alt={pick(lang, s.name, s.name_ar)} style={{ ...img, aspectRatio: '1 / 1' }} />
             <div style={{ padding: '12px 14px' }}>
-              <b style={{ fontFamily: theme.serif, fontSize: 16 }}>{s.name}</b>
-              <div style={{ fontSize: 12, color: theme.muted, marginTop: 2 }}>{s.location}</div>
+              <b style={{ fontFamily: theme.serif, fontSize: 16 }}>{pick(lang, s.name, s.name_ar)}</b>
+              <div style={{ fontSize: 12, color: theme.muted, marginTop: 2 }}>
+                {pick(lang, s.location, s.location_ar)}
+              </div>
             </div>
           </Link>
         ))}
       </div>
 
-      <SectionTitle>New Arrivals</SectionTitle>
+      <SectionTitle>{t(lang, 'newArrivals')}</SectionTitle>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
         {products.map((p) => (
           <Link key={p.id} href={`/products/${p.id}`} style={card}>
-            <img src={firstImage(p.images) || ''} alt={p.name} style={{ ...img, aspectRatio: '4 / 5' }} />
+            <img src={firstImage(p.images) || ''} alt={pick(lang, p.name, p.name_ar)} style={{ ...img, aspectRatio: '4 / 5' }} />
             <div style={{ padding: '12px 14px' }}>
-              <div style={{ fontSize: 11, color: theme.muted, textTransform: 'uppercase', letterSpacing: 1 }}>
-                {p.stores?.name}
+              <div
+                style={{
+                  fontSize: 11,
+                  color: theme.muted,
+                  textTransform: lang === 'en' ? 'uppercase' : 'none',
+                  letterSpacing: lang === 'en' ? 1 : 0,
+                }}
+              >
+                {p.stores ? pick(lang, p.stores.name, p.stores.name_ar) : ''}
               </div>
-              <b style={{ fontSize: 14, display: 'block', marginTop: 2 }}>{p.name}</b>
+              <b style={{ fontSize: 14, display: 'block', marginTop: 2 }}>{pick(lang, p.name, p.name_ar)}</b>
               <div style={{ marginTop: 6 }}>
                 {p.sale_price ? (
                   <>
-                    <b style={{ color: theme.gold }}>{money(p.sale_price)}</b>{' '}
-                    <s style={{ color: theme.muted, fontSize: 12 }}>{money(p.price)}</s>
+                    <b style={{ color: theme.gold }}>{money(lang, p.sale_price)}</b>{' '}
+                    <s style={{ color: theme.muted, fontSize: 12 }}>{money(lang, p.price)}</s>
                   </>
                 ) : (
-                  <b>{money(p.price)}</b>
+                  <b>{money(lang, p.price)}</b>
                 )}
               </div>
             </div>
