@@ -27,26 +27,7 @@ function SectionTitle({ children }) {
   );
 }
 
-export default async function Home() {
-  const lang = await getLang();
-
-  const [storesRes, productsRes] = await Promise.all([
-    supabase
-      .from('stores')
-      .select('id, name, name_ar, logo_url, cover_url, location, location_ar')
-      .limit(6),
-    supabase
-      .from('products')
-      .select('id, name, name_ar, price, sale_price, images, stores(name, name_ar)')
-      .eq('status', 'active')
-      .order('created_at', { ascending: false })
-      .limit(8),
-  ]);
-
-  const stores = storesRes.data ?? [];
-  const products = productsRes.data ?? [];
-  const hasError = storesRes.error || productsRes.error;
-
+function ProductGrid({ products, lang }) {
   const card = {
     background: theme.card,
     borderRadius: theme.radius,
@@ -57,19 +38,65 @@ export default async function Home() {
     color: 'inherit',
     display: 'block',
   };
-  const img = {
-    width: '100%',
-    objectFit: 'cover',
-    background: theme.goldSoft,
-    display: 'block',
-  };
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
+      {products.map((p) => (
+        <Link key={p.id} href={`/products/${p.id}`} style={card}>
+          <img
+            src={firstImage(p.images) || ''}
+            alt={pick(lang, p.name, p.name_ar)}
+            style={{ width: '100%', aspectRatio: '4 / 5', objectFit: 'cover', background: theme.goldSoft, display: 'block' }}
+          />
+          <div style={{ padding: '12px 14px' }}>
+            <b style={{ fontSize: 14, display: 'block' }}>{pick(lang, p.name, p.name_ar)}</b>
+            <div style={{ marginTop: 6 }}>
+              {p.sale_price ? (
+                <>
+                  <b style={{ color: theme.gold }}>{money(lang, p.sale_price)}</b>{' '}
+                  <s style={{ color: theme.muted, fontSize: 12 }}>{money(lang, p.price)}</s>
+                </>
+              ) : (
+                <b>{money(lang, p.price)}</b>
+              )}
+            </div>
+          </div>
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+export default async function Home() {
+  const lang = await getLang();
+
+  const [newRes, offersRes] = await Promise.all([
+    supabase
+      .from('products')
+      .select('id, name, name_ar, price, sale_price, images')
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(8),
+    supabase
+      .from('products')
+      .select('id, name, name_ar, price, sale_price, images')
+      .eq('status', 'active')
+      .not('sale_price', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(6),
+  ]);
+
+  const newProducts = newRes.data ?? [];
+  const offers = offersRes.data ?? [];
+  const hasError = newRes.error || offersRes.error;
 
   return (
     <main style={{ maxWidth: 720, margin: '0 auto', padding: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '8px 0 4px' }}>
         <div>
           <h1 style={{ fontFamily: theme.serif, letterSpacing: 6, fontSize: 30, margin: 0, fontWeight: 600 }}>SHEOUT</h1>
-          <div style={{ fontSize: 12, color: theme.muted, marginTop: 2 }}>{t(lang, 'tagline')}</div>
+          <div style={{ fontSize: 12, color: theme.muted, marginTop: 2 }}>
+            {lang === 'ar' ? 'أزياء عصرية من الأردن' : 'Modern fashion from Jordan'}
+          </div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <LangToggle />
@@ -80,7 +107,7 @@ export default async function Home() {
       <form action="/search" method="GET" style={{ marginTop: 16 }}>
         <input
           name="q"
-          placeholder={t(lang, 'search')}
+          placeholder={lang === 'ar' ? 'ابحث عن منتج...' : 'Search products...'}
           style={{
             width: '100%',
             padding: '14px 18px',
@@ -117,52 +144,15 @@ export default async function Home() {
 
       {hasError && <p style={{ color: '#b00' }}>{t(lang, 'loadError')}</p>}
 
-      <SectionTitle>{t(lang, 'featuredStores')}</SectionTitle>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
-        {stores.map((s) => (
-          <Link key={s.id} href={`/stores/${s.id}`} style={card}>
-            <img src={s.logo_url || s.cover_url || ''} alt={pick(lang, s.name, s.name_ar)} style={{ ...img, aspectRatio: '1 / 1' }} />
-            <div style={{ padding: '12px 14px' }}>
-              <b style={{ fontFamily: theme.serif, fontSize: 16 }}>{pick(lang, s.name, s.name_ar)}</b>
-              <div style={{ fontSize: 12, color: theme.muted, marginTop: 2 }}>
-                {pick(lang, s.location, s.location_ar)}
-              </div>
-            </div>
-          </Link>
-        ))}
-      </div>
-
       <SectionTitle>{t(lang, 'newArrivals')}</SectionTitle>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
-        {products.map((p) => (
-          <Link key={p.id} href={`/products/${p.id}`} style={card}>
-            <img src={firstImage(p.images) || ''} alt={pick(lang, p.name, p.name_ar)} style={{ ...img, aspectRatio: '4 / 5' }} />
-            <div style={{ padding: '12px 14px' }}>
-              <div
-                style={{
-                  fontSize: 11,
-                  color: theme.muted,
-                  textTransform: lang === 'en' ? 'uppercase' : 'none',
-                  letterSpacing: lang === 'en' ? 1 : 0,
-                }}
-              >
-                {p.stores ? pick(lang, p.stores.name, p.stores.name_ar) : ''}
-              </div>
-              <b style={{ fontSize: 14, display: 'block', marginTop: 2 }}>{pick(lang, p.name, p.name_ar)}</b>
-              <div style={{ marginTop: 6 }}>
-                {p.sale_price ? (
-                  <>
-                    <b style={{ color: theme.gold }}>{money(lang, p.sale_price)}</b>{' '}
-                    <s style={{ color: theme.muted, fontSize: 12 }}>{money(lang, p.price)}</s>
-                  </>
-                ) : (
-                  <b>{money(lang, p.price)}</b>
-                )}
-              </div>
-            </div>
-          </Link>
-        ))}
-      </div>
+      <ProductGrid products={newProducts} lang={lang} />
+
+      {offers.length > 0 && (
+        <>
+          <SectionTitle>{lang === 'ar' ? 'عروض خاصة' : 'Special Offers'}</SectionTitle>
+          <ProductGrid products={offers} lang={lang} />
+        </>
+      )}
     </main>
   );
 }
