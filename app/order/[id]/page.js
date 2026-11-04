@@ -1,12 +1,14 @@
 import Link from 'next/link';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import LangToggle from '@/components/LangToggle';
+import { getLang } from '@/lib/serverlang';
+import { t, money, pick, sizeLabel, colorLabel, statusLabel } from '@/lib/i18n';
 import { theme } from '@/lib/theme';
 
 export const dynamic = 'force-dynamic';
 
-const money = (v) => `${Number(v).toFixed(2)} JD`;
-
 export default async function OrderPage({ params }) {
+  const lang = await getLang();
   const { id } = await params;
 
   const { data: order } = await supabaseAdmin
@@ -20,21 +22,28 @@ export default async function OrderPage({ params }) {
   if (!order) {
     return (
       <main style={wrap}>
-        <Link href="/" style={{ color: theme.ink, textDecoration: 'none', fontSize: 14 }}>← Back to SHEOUT</Link>
-        <h2 style={{ fontFamily: theme.serif }}>Order not found</h2>
+        <Link href="/" style={{ color: theme.ink, textDecoration: 'none', fontSize: 14 }}>
+          {lang === 'ar' ? '→ ' : '← '}
+          {t(lang, 'backTo')}
+        </Link>
+        <h2 style={{ fontFamily: theme.serif }}>{t(lang, 'orderNotFound')}</h2>
       </main>
     );
   }
 
   const { data: subOrders } = await supabaseAdmin
     .from('sub_orders')
-    .select('id, subtotal, status, stores(name), order_items(quantity, price, size, color, products(name))')
+    .select('id, subtotal, status, stores(name, name_ar), order_items(quantity, price, size, color, products(name, name_ar))')
     .eq('order_id', id);
 
   const shortId = String(order.id).slice(0, 8).toUpperCase();
 
   return (
     <main style={wrap}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <LangToggle />
+      </div>
+
       <div style={{ textAlign: 'center', margin: '18px 0 20px' }}>
         <div
           style={{
@@ -50,9 +59,11 @@ export default async function OrderPage({ params }) {
         >
           ✓
         </div>
-        <h1 style={{ fontFamily: theme.serif, fontSize: 30, fontWeight: 600, margin: 0 }}>Thank you!</h1>
+        <h1 style={{ fontFamily: theme.serif, fontSize: 30, fontWeight: 600, margin: 0 }}>{t(lang, 'thankYou')}</h1>
         <p style={{ color: theme.muted, margin: '8px 0 0' }}>
-          Your order <b style={{ color: theme.gold }}>#{shortId}</b> has been placed. Payment on delivery.
+          {lang === 'ar' ? 'تم استلام طلبك رقم ' : 'Your order '}
+          <bdi style={{ color: theme.gold, fontWeight: 700 }}>#{shortId}</bdi>
+          {lang === 'ar' ? '. الدفع عند الاستلام.' : ' has been placed. Payment on delivery.'}
         </p>
       </div>
 
@@ -66,11 +77,11 @@ export default async function OrderPage({ params }) {
           marginBottom: 16,
         }}
       >
-        <div>Name: {order.customers?.name}</div>
-        <div>Phone: {order.customers?.phone}</div>
-        <div>Address: {order.address}</div>
-        {order.notes && <div>Notes: {order.notes}</div>}
-        <div>Status: {order.status}</div>
+        <div>{t(lang, 'name')}: {order.customers?.name}</div>
+        <div>{t(lang, 'phone')}: <bdi>{order.customers?.phone}</bdi></div>
+        <div>{t(lang, 'address')}: {order.address}</div>
+        {order.notes && <div>{t(lang, 'notes').replace(' (اختياري)', '').replace(' (optional)', '')}: {order.notes}</div>}
+        <div>{t(lang, 'status')}: {statusLabel(lang, order.status)}</div>
       </div>
 
       {(subOrders ?? []).map((so) => (
@@ -85,30 +96,43 @@ export default async function OrderPage({ params }) {
             marginBottom: 14,
           }}
         >
-          <h3 style={{ fontFamily: theme.serif, fontSize: 18, margin: '0 0 8px' }}>{so.stores?.name}</h3>
+          <h3 style={{ fontFamily: theme.serif, fontSize: 18, margin: '0 0 8px' }}>
+            {so.stores ? pick(lang, so.stores.name, so.stores.name_ar) : ''}
+          </h3>
           {(so.order_items ?? []).map((it, idx) => (
-            <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, padding: '8px 0', borderTop: `1px solid ${theme.line}` }}>
+            <div
+              key={idx}
+              style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, padding: '8px 0', borderTop: `1px solid ${theme.line}` }}
+            >
               <div>
-                {it.products?.name} × {it.quantity}
+                {it.products ? pick(lang, it.products.name, it.products.name_ar) : ''} × {it.quantity}
                 <div style={{ fontSize: 12, color: theme.muted }}>
-                  {[it.size, it.color].filter(Boolean).join(' / ')}
+                  {[it.size ? sizeLabel(lang, it.size) : '', it.color ? colorLabel(lang, it.color) : '']
+                    .filter(Boolean)
+                    .join(' / ')}
                 </div>
               </div>
-              <b>{money(it.price * it.quantity)}</b>
+              <b>{money(lang, it.price * it.quantity)}</b>
             </div>
           ))}
-          <div style={{ textAlign: 'right', marginTop: 8, fontSize: 14 }}>
-            Store subtotal: <b style={{ color: theme.gold }}>{money(so.subtotal)}</b>
+          <div style={{ textAlign: 'end', marginTop: 8, fontSize: 14 }}>
+            {t(lang, 'storeSubtotal')}: <b style={{ color: theme.gold }}>{money(lang, so.subtotal)}</b>
           </div>
         </section>
       ))}
 
       <div style={{ borderTop: `2px solid ${theme.ink}`, paddingTop: 14, lineHeight: 1.9 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Items</span><span>{money(order.subtotal)}</span></div>
-        <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Delivery</span><span>{money(order.delivery_fee)}</span></div>
+        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <span>{t(lang, 'items')}</span>
+          <span>{money(lang, order.subtotal)}</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <span>{t(lang, 'delivery')}</span>
+          <span>{money(lang, order.delivery_fee)}</span>
+        </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 20 }}>
-          <b style={{ fontFamily: theme.serif }}>Total</b>
-          <b>{money(order.total)}</b>
+          <b style={{ fontFamily: theme.serif }}>{t(lang, 'total')}</b>
+          <b>{money(lang, order.total)}</b>
         </div>
       </div>
 
@@ -126,7 +150,7 @@ export default async function OrderPage({ params }) {
           textDecoration: 'none',
         }}
       >
-        Continue shopping
+        {t(lang, 'continueShopping')}
       </Link>
     </main>
   );
