@@ -39,9 +39,6 @@ export default function AddToCart({ product, sizes, colors }) {
     }
     addToCart({
       productId: product.id,
-      storeId: product.storeId,
-      storeName: product.storeName,
-      storeNameAr: product.storeNameAr || '',
       name: product.name,
       nameAr: product.nameAr || '',
       image: product.image,
