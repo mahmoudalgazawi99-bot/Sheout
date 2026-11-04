@@ -5,11 +5,14 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getCart, clearCart } from '@/lib/cart';
 import { theme } from '@/lib/theme';
+import { useLang } from '@/components/LangProvider';
+import LangToggle from '@/components/LangToggle';
+import { t, money, translateError } from '@/lib/i18n';
 
-const money = (v) => `${Number(v).toFixed(2)} JD`;
 const DELIVERY_FEE = 3;
 
 export default function CheckoutPage() {
+  const lang = useLang();
   const router = useRouter();
   const [items, setItems] = useState([]);
   const [ready, setReady] = useState(false);
@@ -43,7 +46,7 @@ export default function CheckoutPage() {
   async function placeOrder() {
     setError('');
     if (!name.trim() || !phone.trim() || !address.trim()) {
-      setError('Please fill in name, phone and address');
+      setError(t(lang, 'errFill'));
       return;
     }
     setLoading(true);
@@ -66,49 +69,59 @@ export default function CheckoutPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || 'Something went wrong');
+        setError(translateError(lang, data.error));
         setLoading(false);
         return;
       }
       clearCart();
       router.push(`/order/${data.orderId}`);
     } catch {
-      setError('Network error, please try again');
+      setError(t(lang, 'errNetwork'));
       setLoading(false);
     }
   }
 
   return (
     <main style={{ maxWidth: 720, margin: '0 auto', padding: 16 }}>
-      <Link href="/cart" style={{ color: theme.ink, textDecoration: 'none', fontSize: 14 }}>
-        ← Back to cart
-      </Link>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Link href="/cart" style={{ color: theme.ink, textDecoration: 'none', fontSize: 14 }}>
+          {lang === 'ar' ? '→ ' : '← '}
+          {t(lang, 'backToCart')}
+        </Link>
+        <LangToggle />
+      </div>
       <div style={{ margin: '14px 0 16px' }}>
-        <h1 style={{ fontFamily: theme.serif, fontSize: 28, fontWeight: 600, margin: 0 }}>Checkout</h1>
+        <h1 style={{ fontFamily: theme.serif, fontSize: 28, fontWeight: 600, margin: 0 }}>{t(lang, 'checkout')}</h1>
         <div style={{ width: 36, height: 3, background: theme.gold, borderRadius: 2, marginTop: 6 }} />
       </div>
 
-      {ready && items.length === 0 && <p style={{ color: theme.muted }}>Your cart is empty.</p>}
+      {ready && items.length === 0 && <p style={{ color: theme.muted }}>{t(lang, 'cartEmpty')}</p>}
 
       {items.length > 0 && (
         <>
           <label style={label}>
-            Full name
+            {t(lang, 'fullName')}
             <input style={input} value={name} onChange={(e) => setName(e.target.value)} />
           </label>
           <div style={{ height: 14 }} />
           <label style={label}>
-            Phone
-            <input style={input} type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
+            {t(lang, 'phone')}
+            <input
+              style={{ ...input, textAlign: lang === 'ar' ? 'right' : 'left' }}
+              dir="ltr"
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+            />
           </label>
           <div style={{ height: 14 }} />
           <label style={label}>
-            Delivery address
+            {t(lang, 'address')}
             <input style={input} value={address} onChange={(e) => setAddress(e.target.value)} />
           </label>
           <div style={{ height: 14 }} />
           <label style={label}>
-            Notes (optional)
+            {t(lang, 'notes')}
             <input style={input} value={notes} onChange={(e) => setNotes(e.target.value)} />
           </label>
 
@@ -119,17 +132,24 @@ export default function CheckoutPage() {
               borderRadius: 12,
               padding: '10px 14px',
               fontSize: 14,
+              fontWeight: 600,
             }}
           >
-            Payment: <b>cash on delivery</b>
+            {t(lang, 'paymentCod')}
           </div>
 
           <div style={{ borderTop: `2px solid ${theme.ink}`, paddingTop: 14, marginTop: 18, lineHeight: 1.9 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Items</span><span>{money(subtotal)}</span></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Delivery</span><span>{money(DELIVERY_FEE)}</span></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>{t(lang, 'items')}</span>
+              <span>{money(lang, subtotal)}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>{t(lang, 'delivery')}</span>
+              <span>{money(lang, DELIVERY_FEE)}</span>
+            </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 20 }}>
-              <b style={{ fontFamily: theme.serif }}>Total</b>
-              <b>{money(total)}</b>
+              <b style={{ fontFamily: theme.serif }}>{t(lang, 'total')}</b>
+              <b>{money(lang, total)}</b>
             </div>
           </div>
 
@@ -149,10 +169,10 @@ export default function CheckoutPage() {
               color: loading ? '#fff' : theme.gold,
               fontSize: 16,
               fontWeight: 600,
-              letterSpacing: 0.5,
+              letterSpacing: lang === 'en' ? 0.5 : 0,
             }}
           >
-            {loading ? 'Placing order...' : 'Place order'}
+            {loading ? t(lang, 'placing') : t(lang, 'placeOrder')}
           </button>
         </>
       )}
