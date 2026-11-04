@@ -2,6 +2,9 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
 import AddToCart from '@/components/AddToCart';
 import CartLink from '@/components/CartLink';
+import LangToggle from '@/components/LangToggle';
+import { getLang } from '@/lib/serverlang';
+import { t, money, pick } from '@/lib/i18n';
 import { theme } from '@/lib/theme';
 
 export const dynamic = 'force-dynamic';
@@ -18,14 +21,13 @@ function toList(v) {
   return [];
 }
 
-const money = (v) => `${Number(v).toFixed(2)} JD`;
-
 export default async function ProductPage({ params }) {
+  const lang = await getLang();
   const { id } = await params;
 
   const { data: product } = await supabase
     .from('products')
-    .select('id, store_id, name, description, category, price, sale_price, sizes, colors, quantity, images, status, stores(id, name)')
+    .select('id, store_id, name, name_ar, description, category, price, sale_price, sizes, colors, quantity, images, status, stores(id, name, name_ar)')
     .eq('id', id)
     .maybeSingle();
 
@@ -33,9 +35,13 @@ export default async function ProductPage({ params }) {
   const topBar = (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
       <Link href="/" style={{ color: theme.ink, textDecoration: 'none', fontSize: 14 }}>
-        ← Back to SHEOUT
+        {lang === 'ar' ? '→ ' : '← '}
+        {t(lang, 'backTo')}
       </Link>
-      <CartLink />
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <LangToggle />
+        <CartLink />
+      </div>
     </div>
   );
 
@@ -43,7 +49,7 @@ export default async function ProductPage({ params }) {
     return (
       <main style={wrap}>
         {topBar}
-        <h2 style={{ fontFamily: theme.serif }}>Product not found</h2>
+        <h2 style={{ fontFamily: theme.serif }}>{t(lang, 'productNotFound')}</h2>
       </main>
     );
   }
@@ -53,6 +59,7 @@ export default async function ProductPage({ params }) {
   const colors = toList(product.colors);
   const inStock = Number(product.quantity) > 0;
   const effectivePrice = product.sale_price || product.price;
+  const productName = pick(lang, product.name, product.name_ar);
 
   return (
     <main style={wrap}>
@@ -60,7 +67,7 @@ export default async function ProductPage({ params }) {
 
       <img
         src={images[0] || ''}
-        alt={product.name}
+        alt={productName}
         style={{
           width: '100%',
           aspectRatio: '4 / 5',
@@ -82,28 +89,35 @@ export default async function ProductPage({ params }) {
       )}
 
       {product.stores && (
-        <div style={{ marginTop: 18, fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.5 }}>
+        <div
+          style={{
+            marginTop: 18,
+            fontSize: 12,
+            textTransform: lang === 'en' ? 'uppercase' : 'none',
+            letterSpacing: lang === 'en' ? 1.5 : 0,
+          }}
+        >
           <Link href={`/stores/${product.stores.id}`} style={{ color: theme.gold, textDecoration: 'none', fontWeight: 600 }}>
-            {product.stores.name}
+            {pick(lang, product.stores.name, product.stores.name_ar)}
           </Link>
         </div>
       )}
 
-      <h1 style={{ fontFamily: theme.serif, fontSize: 28, fontWeight: 600, margin: '4px 0 8px' }}>{product.name}</h1>
+      <h1 style={{ fontFamily: theme.serif, fontSize: 28, fontWeight: 600, margin: '4px 0 8px' }}>{productName}</h1>
 
       <div style={{ fontSize: 22 }}>
         {product.sale_price ? (
           <>
-            <b style={{ color: theme.gold }}>{money(product.sale_price)}</b>{' '}
-            <s style={{ color: theme.muted, fontSize: 15 }}>{money(product.price)}</s>
+            <b style={{ color: theme.gold }}>{money(lang, product.sale_price)}</b>{' '}
+            <s style={{ color: theme.muted, fontSize: 15 }}>{money(lang, product.price)}</s>
           </>
         ) : (
-          <b>{money(product.price)}</b>
+          <b>{money(lang, product.price)}</b>
         )}
       </div>
 
       <div style={{ marginTop: 8, fontSize: 13, color: inStock ? '#177a3c' : '#b00' }}>
-        {inStock ? 'In stock' : 'Out of stock'}
+        {inStock ? t(lang, 'inStock') : t(lang, 'outOfStock')}
       </div>
 
       {product.description && (
@@ -114,10 +128,12 @@ export default async function ProductPage({ params }) {
         product={{
           id: product.id,
           name: product.name,
+          nameAr: product.name_ar || '',
           price: effectivePrice,
           image: images[0] || '',
           storeId: product.stores ? product.stores.id : product.store_id,
           storeName: product.stores ? product.stores.name : '',
+          storeNameAr: product.stores ? product.stores.name_ar || '' : '',
           quantity: product.quantity,
         }}
         sizes={sizes}
