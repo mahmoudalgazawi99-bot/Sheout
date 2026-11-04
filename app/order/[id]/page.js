@@ -33,9 +33,10 @@ export default async function OrderPage({ params }) {
 
   const { data: subOrders } = await supabaseAdmin
     .from('sub_orders')
-    .select('id, subtotal, status, stores(name, name_ar), order_items(quantity, price, size, color, products(name, name_ar))')
+    .select('id, order_items(quantity, price, size, color, products(name, name_ar))')
     .eq('order_id', id);
 
+  const items = (subOrders ?? []).flatMap((so) => so.order_items ?? []);
   const shortId = String(order.id).slice(0, 8).toUpperCase();
 
   return (
@@ -80,46 +81,43 @@ export default async function OrderPage({ params }) {
         <div>{t(lang, 'name')}: {order.customers?.name}</div>
         <div>{t(lang, 'phone')}: <bdi>{order.customers?.phone}</bdi></div>
         <div>{t(lang, 'address')}: {order.address}</div>
-        {order.notes && <div>{t(lang, 'notes').replace(' (اختياري)', '').replace(' (optional)', '')}: {order.notes}</div>}
+        {order.notes && <div>{lang === 'ar' ? 'ملاحظات' : 'Notes'}: {order.notes}</div>}
         <div>{t(lang, 'status')}: {statusLabel(lang, order.status)}</div>
       </div>
 
-      {(subOrders ?? []).map((so) => (
-        <section
-          key={so.id}
-          style={{
-            background: theme.card,
-            border: `1px solid ${theme.line}`,
-            borderRadius: theme.radius,
-            boxShadow: theme.shadow,
-            padding: 14,
-            marginBottom: 14,
-          }}
-        >
-          <h3 style={{ fontFamily: theme.serif, fontSize: 18, margin: '0 0 8px' }}>
-            {so.stores ? pick(lang, so.stores.name, so.stores.name_ar) : ''}
-          </h3>
-          {(so.order_items ?? []).map((it, idx) => (
-            <div
-              key={idx}
-              style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, padding: '8px 0', borderTop: `1px solid ${theme.line}` }}
-            >
-              <div>
-                {it.products ? pick(lang, it.products.name, it.products.name_ar) : ''} × {it.quantity}
-                <div style={{ fontSize: 12, color: theme.muted }}>
-                  {[it.size ? sizeLabel(lang, it.size) : '', it.color ? colorLabel(lang, it.color) : '']
-                    .filter(Boolean)
-                    .join(' / ')}
-                </div>
+      <section
+        style={{
+          background: theme.card,
+          border: `1px solid ${theme.line}`,
+          borderRadius: theme.radius,
+          boxShadow: theme.shadow,
+          padding: '4px 14px',
+          marginBottom: 14,
+        }}
+      >
+        {items.map((it, idx) => (
+          <div
+            key={idx}
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              fontSize: 14,
+              padding: '10px 0',
+              borderTop: idx === 0 ? 'none' : `1px solid ${theme.line}`,
+            }}
+          >
+            <div>
+              {it.products ? pick(lang, it.products.name, it.products.name_ar) : ''} × {it.quantity}
+              <div style={{ fontSize: 12, color: theme.muted }}>
+                {[it.size ? sizeLabel(lang, it.size) : '', it.color ? colorLabel(lang, it.color) : '']
+                  .filter(Boolean)
+                  .join(' / ')}
               </div>
-              <b>{money(lang, it.price * it.quantity)}</b>
             </div>
-          ))}
-          <div style={{ textAlign: 'end', marginTop: 8, fontSize: 14 }}>
-            {t(lang, 'storeSubtotal')}: <b style={{ color: theme.gold }}>{money(lang, so.subtotal)}</b>
+            <b>{money(lang, it.price * it.quantity)}</b>
           </div>
-        </section>
-      ))}
+        ))}
+      </section>
 
       <div style={{ borderTop: `2px solid ${theme.ink}`, paddingTop: 14, lineHeight: 1.9 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
