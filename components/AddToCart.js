@@ -4,8 +4,11 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { addToCart } from '@/lib/cart';
 import { theme } from '@/lib/theme';
+import { useLang } from '@/components/LangProvider';
+import { t, sizeLabel, colorLabel } from '@/lib/i18n';
 
 export default function AddToCart({ product, sizes, colors }) {
+  const lang = useLang();
   const [size, setSize] = useState('');
   const [color, setColor] = useState('');
   const [message, setMessage] = useState('');
@@ -27,18 +30,20 @@ export default function AddToCart({ product, sizes, colors }) {
 
   function handleAdd() {
     if (sizes.length > 0 && !size) {
-      setMessage('Please choose a size');
+      setMessage(t(lang, 'chooseSize'));
       return;
     }
     if (colors.length > 0 && !color) {
-      setMessage('Please choose a color');
+      setMessage(t(lang, 'chooseColor'));
       return;
     }
     addToCart({
       productId: product.id,
       storeId: product.storeId,
       storeName: product.storeName,
+      storeNameAr: product.storeNameAr || '',
       name: product.name,
+      nameAr: product.nameAr || '',
       image: product.image,
       price: Number(product.price),
       size,
@@ -54,11 +59,11 @@ export default function AddToCart({ product, sizes, colors }) {
     <div style={{ marginTop: 12 }}>
       {sizes.length > 0 && (
         <div style={{ marginTop: 16 }}>
-          <div style={label}>Sizes</div>
+          <div style={label}>{t(lang, 'sizes')}</div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
             {sizes.map((s) => (
               <button key={s} type="button" onClick={() => { setSize(s); setAdded(false); }} style={chip(size === s)}>
-                {s}
+                {sizeLabel(lang, s)}
               </button>
             ))}
           </div>
@@ -67,11 +72,11 @@ export default function AddToCart({ product, sizes, colors }) {
 
       {colors.length > 0 && (
         <div style={{ marginTop: 16 }}>
-          <div style={label}>Colors</div>
+          <div style={label}>{t(lang, 'colors')}</div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
             {colors.map((c) => (
               <button key={c} type="button" onClick={() => { setColor(c); setAdded(false); }} style={chip(color === c)}>
-                {c}
+                {colorLabel(lang, c)}
               </button>
             ))}
           </div>
@@ -94,16 +99,16 @@ export default function AddToCart({ product, sizes, colors }) {
           color: inStock ? theme.gold : '#fff',
           fontSize: 16,
           fontWeight: 600,
-          letterSpacing: 0.5,
+          letterSpacing: lang === 'en' ? 0.5 : 0,
         }}
       >
-        {inStock ? 'Add to cart' : 'Out of stock'}
+        {inStock ? t(lang, 'addToCart') : t(lang, 'outOfStock')}
       </button>
 
       {added && (
         <p style={{ fontSize: 14 }}>
-          Added to cart.{' '}
-          <Link href="/cart" style={{ color: theme.gold, fontWeight: 600 }}>View cart</Link>
+          {t(lang, 'addedToCart')}{' '}
+          <Link href="/cart" style={{ color: theme.gold, fontWeight: 600 }}>{t(lang, 'viewCart')}</Link>
         </p>
       )}
     </div>
