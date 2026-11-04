@@ -30,22 +30,12 @@ export default async function SearchPage({ searchParams }) {
 
   let productsQuery = supabase
     .from('products')
-    .select('id, name, name_ar, price, sale_price, images, stores(name, name_ar)')
+    .select('id, name, name_ar, price, sale_price, images')
     .eq('status', 'active')
     .order('created_at', { ascending: false })
     .limit(40);
   if (category) productsQuery = productsQuery.eq('category', category);
   if (q) productsQuery = productsQuery.or(`name.ilike.${pattern},name_ar.ilike.${pattern}`);
-
-  let stores = [];
-  if (q && !category) {
-    const { data } = await supabase
-      .from('stores')
-      .select('id, name, name_ar, logo_url, cover_url, location, location_ar')
-      .or(`name.ilike.${pattern},name_ar.ilike.${pattern}`)
-      .limit(10);
-    stores = data ?? [];
-  }
 
   const { data: productsData } = await productsQuery;
   const products = productsData ?? [];
@@ -58,12 +48,6 @@ export default async function SearchPage({ searchParams }) {
     border: `1px solid ${theme.line}`,
     textDecoration: 'none',
     color: 'inherit',
-    display: 'block',
-  };
-  const img = {
-    width: '100%',
-    objectFit: 'cover',
-    background: theme.goldSoft,
     display: 'block',
   };
 
@@ -90,7 +74,7 @@ export default async function SearchPage({ searchParams }) {
         <input
           name="q"
           defaultValue={q}
-          placeholder={t(lang, 'search')}
+          placeholder={lang === 'ar' ? 'ابحث عن منتج...' : 'Search products...'}
           style={{
             width: '100%',
             padding: '14px 18px',
@@ -131,47 +115,20 @@ export default async function SearchPage({ searchParams }) {
         <div style={{ width: 36, height: 3, background: theme.gold, borderRadius: 2, marginTop: 6 }} />
       </div>
 
-      {stores.length > 0 && (
-        <>
-          <h3 style={{ fontFamily: theme.serif, margin: '0 0 10px' }}>{t(lang, 'stores')}</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
-            {stores.map((s) => (
-              <Link key={s.id} href={`/stores/${s.id}`} style={card}>
-                <img src={s.logo_url || s.cover_url || ''} alt={pick(lang, s.name, s.name_ar)} style={{ ...img, aspectRatio: '1 / 1' }} />
-                <div style={{ padding: '12px 14px' }}>
-                  <b style={{ fontFamily: theme.serif, fontSize: 16 }}>{pick(lang, s.name, s.name_ar)}</b>
-                  <div style={{ fontSize: 12, color: theme.muted, marginTop: 2 }}>
-                    {pick(lang, s.location, s.location_ar)}
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </>
-      )}
-
-      <h3 style={{ fontFamily: theme.serif, margin: '22px 0 10px' }}>
+      <h3 style={{ fontFamily: theme.serif, margin: '0 0 10px' }}>
         {t(lang, 'products')} ({products.length})
       </h3>
-      {products.length === 0 && stores.length === 0 && (
-        <p style={{ color: theme.muted }}>{t(lang, 'noResults')}</p>
-      )}
+      {products.length === 0 && <p style={{ color: theme.muted }}>{t(lang, 'noResults')}</p>}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
         {products.map((p) => (
           <Link key={p.id} href={`/products/${p.id}`} style={card}>
-            <img src={firstImage(p.images) || ''} alt={pick(lang, p.name, p.name_ar)} style={{ ...img, aspectRatio: '4 / 5' }} />
+            <img
+              src={firstImage(p.images) || ''}
+              alt={pick(lang, p.name, p.name_ar)}
+              style={{ width: '100%', aspectRatio: '4 / 5', objectFit: 'cover', background: theme.goldSoft, display: 'block' }}
+            />
             <div style={{ padding: '12px 14px' }}>
-              <div
-                style={{
-                  fontSize: 11,
-                  color: theme.muted,
-                  textTransform: lang === 'en' ? 'uppercase' : 'none',
-                  letterSpacing: lang === 'en' ? 1 : 0,
-                }}
-              >
-                {p.stores ? pick(lang, p.stores.name, p.stores.name_ar) : ''}
-              </div>
-              <b style={{ fontSize: 14, display: 'block', marginTop: 2 }}>{pick(lang, p.name, p.name_ar)}</b>
+              <b style={{ fontSize: 14, display: 'block' }}>{pick(lang, p.name, p.name_ar)}</b>
               <div style={{ marginTop: 6 }}>
                 {p.sale_price ? (
                   <>
