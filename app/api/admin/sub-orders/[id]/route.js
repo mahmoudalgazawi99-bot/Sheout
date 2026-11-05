@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { isAdmin } from '@/lib/adminauth';
 
-const STATUSES = ['new', 'confirmed', 'delivered', 'cancelled'];
+const STATUSES = ['new', 'confirmed', 'ready', 'delivered', 'cancelled'];
 
 export async function PATCH(request, { params }) {
   if (!(await isAdmin())) {
