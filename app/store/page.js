@@ -4,6 +4,7 @@ import { getStoreSession } from '@/lib/storeauth';
 import StoreLogout from '@/components/storelogout';
 import StoreOrderActions from '@/components/storeorderactions';
 import AutoRefresh from '@/components/autorefresh';
+import PushSetup from '@/components/pushsetup';
 import { sizeLabel, colorLabel } from '@/lib/i18n';
 import { theme } from '@/lib/theme';
 
@@ -130,6 +131,8 @@ export default async function StoreHome() {
       >
         {newCount > 0 ? `عندك ${newCount} طلب جديد بانتظار القبول` : 'ما في طلبات جديدة حالياً'}
       </div>
+
+      <PushSetup publicKey={process.env.VAPID_PUBLIC_KEY || ''} />
 
       {orders.length === 0 && <p style={{ color: theme.muted }}>لسا ما وصلك أي طلب.</p>}
 
