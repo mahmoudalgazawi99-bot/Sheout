@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
-import { sendToAccounts } from '@/lib/push';
+import { sendToAccounts, sendToAdmins } from '@/lib/push';
 
 const DELIVERY_FEE = 3;
 
@@ -34,6 +34,22 @@ async function notifyStores(groups) {
         });
       })
     );
+  } catch {}
+}
+
+async function notifyAdmins(orderId, groups, total) {
+  try {
+    const storeIds = Object.keys(groups);
+    const pieces = storeIds.reduce(
+      (sum, sid) => sum + groups[sid].items.reduce((a, l) => a + l.qty, 0),
+      0
+    );
+    const shortId = String(orderId).slice(0, 8).toUpperCase();
+    await sendToAdmins({
+      title: 'طلب جديد على Sheout',
+      body: `#${shortId} · ${pieces} قطعة من ${storeIds.length} ${storeIds.length === 1 ? 'محل' : 'محلات'} · ${total.toFixed(2)} د.أ`,
+      url: `/admin/orders/${orderId}`,
+    });
   } catch {}
 }
 
@@ -181,7 +197,7 @@ export async function POST(request) {
       .eq('id', pid);
   }
 
-  await notifyStores(groups);
+  await Promise.all([notifyStores(groups), notifyAdmins(orderId, groups, total)]);
 
   return NextResponse.json({ orderId });
 }
