@@ -10,6 +10,17 @@ export const dynamic = 'force-dynamic';
 const money = (v) => `${Number(v).toFixed(2)} JD`;
 const when = (v) => String(v).replace('T', ' ').slice(0, 16);
 
+const linkBtn = {
+  display: 'inline-block',
+  border: '1px solid #ddd',
+  borderRadius: 8,
+  padding: '8px 12px',
+  fontSize: 13,
+  color: '#111',
+  textDecoration: 'none',
+  background: '#fff',
+};
+
 export default async function AdminPage() {
   if (!(await isAdmin())) redirect('/admin/login');
 
@@ -28,20 +39,11 @@ export default async function AdminPage() {
         <AdminLogout />
       </div>
 
-      <div style={{ margin: '12px 0' }}>
-        <Link
-          href="/admin/stores"
-          style={{
-            display: 'inline-block',
-            border: '1px solid #ddd',
-            borderRadius: 8,
-            padding: '8px 12px',
-            fontSize: 13,
-            color: '#111',
-            textDecoration: 'none',
-            background: '#fff',
-          }}
-        >
+      <div style={{ margin: '12px 0', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <Link href="/admin/analytics" style={{ ...linkBtn, background: '#111', color: '#fff', border: '1px solid #111' }}>
+          Analytics
+        </Link>
+        <Link href="/admin/stores" style={linkBtn}>
           Store accounts
         </Link>
       </div>
