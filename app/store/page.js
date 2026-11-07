@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { getStoreSession } from '@/lib/storeauth';
@@ -5,12 +6,21 @@ import StoreLogout from '@/components/storelogout';
 import StoreOrderActions from '@/components/storeorderactions';
 import AutoRefresh from '@/components/autorefresh';
 import PushSetup from '@/components/pushsetup';
+import StoreBell from '@/components/storebell';
+import { computeStoreStats } from '@/lib/storestats';
 import { sizeLabel, colorLabel } from '@/lib/i18n';
 import { theme } from '@/lib/theme';
 
 export const dynamic = 'force-dynamic';
 
 const money = (v) => `${Number(v).toFixed(2)} د.أ`;
+
+const RANGES = [
+  ['today', 'اليوم'],
+  ['7', '7 أيام'],
+  ['30', '30 يوم'],
+  ['all', 'الكل'],
+];
 
 function firstImage(images) {
   if (!Array.isArray(images) || images.length === 0) return null;
@@ -35,6 +45,35 @@ const SECTIONS = [
 ];
 
 const HISTORY_LABEL = { delivered: 'تم التوصيل', cancelled: 'ملغي' };
+
+const chip = (active) => ({
+  padding: '8px 14px',
+  borderRadius: 999,
+  fontSize: 13,
+  textDecoration: 'none',
+  whiteSpace: 'nowrap',
+  border: `1px solid ${active ? theme.ink : theme.line}`,
+  background: active ? theme.ink : theme.card,
+  color: active ? theme.gold : theme.ink,
+});
+
+function StatCard({ label, value, sub, valueSize = 20 }) {
+  return (
+    <div
+      style={{
+        background: theme.card,
+        border: `1px solid ${theme.line}`,
+        borderRadius: theme.radius,
+        boxShadow: theme.shadow,
+        padding: 12,
+      }}
+    >
+      <div style={{ fontSize: 12, color: theme.muted }}>{label}</div>
+      <div style={{ fontSize: valueSize, fontWeight: 700, marginTop: 4 }}>{value}</div>
+      {sub ? <div style={{ fontSize: 12, color: theme.muted, marginTop: 2 }}>{sub}</div> : null}
+    </div>
+  );
+}
 
 function OrderCard({ so, showActions }) {
   const shortId = String(so.order_id).slice(0, 8).toUpperCase();
@@ -92,9 +131,13 @@ function OrderCard({ so, showActions }) {
   );
 }
 
-export default async function StoreHome() {
+export default async function StoreHome({ searchParams }) {
   const account = await getStoreSession();
   if (!account) redirect('/store/login');
+
+  const sp = await searchParams;
+  const rawRange = Array.isArray(sp?.range) ? sp.range[0] : sp?.range;
+  const range = RANGES.some(([k]) => k === rawRange) ? rawRange : 'all';
 
   const storeName = (account.stores && (account.stores.name_ar || account.stores.name)) || '';
 
@@ -105,7 +148,17 @@ export default async function StoreHome() {
     .order('created_at', { ascending: false })
     .limit(60);
 
+  const { data: statsData } = await supabaseAdmin
+    .from('sub_orders')
+    .select('status, subtotal, created_at, order_items(quantity, price, products(name, name_ar))')
+    .eq('store_id', account.store_id)
+    .order('created_at', { ascending: false })
+    .limit(1000);
+
   const orders = data ?? [];
+  const stats = computeStoreStats(statsData ?? [], range);
+  const maxQty = stats.top[0] ? stats.top[0].qty : 1;
+
   const byStatus = (s) => orders.filter((o) => o.status === s);
   const history = orders.filter((o) => o.status === 'delivered' || o.status === 'cancelled');
   const newCount = byStatus('new').length;
@@ -114,9 +167,34 @@ export default async function StoreHome() {
     <main style={{ maxWidth: 720, margin: '0 auto', padding: 16 }}>
       <AutoRefresh seconds={30} />
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
         <h1 style={{ fontFamily: theme.serif, fontSize: 24, margin: 0 }}>{storeName}</h1>
-        <StoreLogout />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <StoreBell count={newCount}>
+            <div style={{ fontWeight: 700, marginBottom: 8 }}>
+              {newCount > 0 ? `عندك ${newCount} طلب جديد بانتظار القبول` : 'ما في طلبات جديدة حالياً'}
+            </div>
+            {newCount > 0 && (
+              <a
+                href="#sec-new"
+                style={{
+                  display: 'inline-block',
+                  padding: '9px 16px',
+                  borderRadius: 999,
+                  background: theme.ink,
+                  color: theme.gold,
+                  fontSize: 14,
+                  fontWeight: 600,
+                  textDecoration: 'none',
+                }}
+              >
+                عرض الطلبات الجديدة
+              </a>
+            )}
+            <PushSetup publicKey={process.env.VAPID_PUBLIC_KEY || ''} />
+          </StoreBell>
+          <StoreLogout />
+        </div>
       </div>
 
       <div
@@ -132,7 +210,66 @@ export default async function StoreHome() {
         {newCount > 0 ? `عندك ${newCount} طلب جديد بانتظار القبول` : 'ما في طلبات جديدة حالياً'}
       </div>
 
-      <PushSetup publicKey={process.env.VAPID_PUBLIC_KEY || ''} />
+      <section style={{ marginTop: 18 }}>
+        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
+          {RANGES.map(([k, label]) => (
+            <Link key={k} href={`/store?range=${k}`} style={chip(k === range)}>
+              {label}
+            </Link>
+          ))}
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, marginTop: 10 }}>
+          <StatCard label="عدد الطلبات" value={stats.orders} />
+          <StatCard label="مجموع قيمة الطلبات" value={money(stats.amount)} />
+          <StatCard label="القطع المباعة" value={stats.pieces} />
+          <StatCard
+            label="الأكثر طلباً"
+            value={stats.top[0] ? stats.top[0].name : '—'}
+            sub={stats.top[0] ? `${stats.top[0].qty} قطعة` : ''}
+            valueSize={16}
+          />
+        </div>
+
+        {stats.top.length > 1 && (
+          <div
+            style={{
+              marginTop: 10,
+              background: theme.card,
+              border: `1px solid ${theme.line}`,
+              borderRadius: theme.radius,
+              boxShadow: theme.shadow,
+              padding: 12,
+            }}
+          >
+            <div style={{ fontWeight: 700, marginBottom: 8 }}>أكثر المنتجات طلباً</div>
+            {stats.top.map((p, i) => (
+              <div key={p.name} style={{ marginBottom: i === stats.top.length - 1 ? 0 : 10 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
+                  <span>
+                    {i + 1}. {p.name}
+                  </span>
+                  <b>{p.qty} قطعة</b>
+                </div>
+                <div style={{ height: 6, background: theme.goldSoft, borderRadius: 3, marginTop: 4 }}>
+                  <div
+                    style={{
+                      width: `${(p.qty / maxQty) * 100}%`,
+                      height: '100%',
+                      background: theme.gold,
+                      borderRadius: 3,
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div style={{ fontSize: 12, color: theme.muted, marginTop: 8 }}>
+          الإحصائيات بتستثني الطلبات الملغية.
+        </div>
+      </section>
 
       {orders.length === 0 && <p style={{ color: theme.muted }}>لسا ما وصلك أي طلب.</p>}
 
@@ -140,7 +277,7 @@ export default async function StoreHome() {
         const list = byStatus(sec.key);
         if (list.length === 0) return null;
         return (
-          <section key={sec.key} style={{ marginTop: 22 }}>
+          <section key={sec.key} id={`sec-${sec.key}`} style={{ marginTop: 22, scrollMarginTop: 80 }}>
             <h2 style={{ fontFamily: theme.serif, fontSize: 20, margin: 0 }}>
               {sec.title} ({list.length})
             </h2>
