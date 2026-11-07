@@ -7,7 +7,7 @@ import StoreOrderActions from '@/components/storeorderactions';
 import AutoRefresh from '@/components/autorefresh';
 import PushSetup from '@/components/pushsetup';
 import StoreBell from '@/components/storebell';
-import { computeStoreStats } from '@/lib/storestats';
+import { computeStoreStats, computeStoreLive } from '@/lib/storestats';
 import { sizeLabel, colorLabel } from '@/lib/i18n';
 import { theme } from '@/lib/theme';
 
@@ -57,20 +57,21 @@ const chip = (active) => ({
   color: active ? theme.gold : theme.ink,
 });
 
-function StatCard({ label, value, sub, valueSize = 20 }) {
+function StatCard({ label, value, sub, valueSize = 20, highlight = false }) {
   return (
     <div
       style={{
-        background: theme.card,
-        border: `1px solid ${theme.line}`,
+        background: highlight ? theme.ink : theme.card,
+        color: highlight ? theme.gold : theme.ink,
+        border: `1px solid ${highlight ? theme.ink : theme.line}`,
         borderRadius: theme.radius,
         boxShadow: theme.shadow,
         padding: 12,
       }}
     >
-      <div style={{ fontSize: 12, color: theme.muted }}>{label}</div>
+      <div style={{ fontSize: 12, color: highlight ? theme.gold : theme.muted }}>{label}</div>
       <div style={{ fontSize: valueSize, fontWeight: 700, marginTop: 4 }}>{value}</div>
-      {sub ? <div style={{ fontSize: 12, color: theme.muted, marginTop: 2 }}>{sub}</div> : null}
+      {sub ? <div style={{ fontSize: 12, color: highlight ? theme.gold : theme.muted, marginTop: 2 }}>{sub}</div> : null}
     </div>
   );
 }
@@ -137,7 +138,7 @@ export default async function StoreHome({ searchParams }) {
 
   const sp = await searchParams;
   const rawRange = Array.isArray(sp?.range) ? sp.range[0] : sp?.range;
-  const range = RANGES.some(([k]) => k === rawRange) ? rawRange : 'all';
+  const range = RANGES.some(([k]) => k === rawRange) ? rawRange : 'today';
 
   const storeName = (account.stores && (account.stores.name_ar || account.stores.name)) || '';
 
@@ -157,11 +158,12 @@ export default async function StoreHome({ searchParams }) {
 
   const orders = data ?? [];
   const stats = computeStoreStats(statsData ?? [], range);
+  const live = computeStoreLive(statsData ?? []);
   const maxQty = stats.top[0] ? stats.top[0].qty : 1;
 
   const byStatus = (s) => orders.filter((o) => o.status === s);
   const history = orders.filter((o) => o.status === 'delivered' || o.status === 'cancelled');
-  const newCount = byStatus('new').length;
+  const newCount = live.waiting;
 
   return (
     <main style={{ maxWidth: 720, margin: '0 auto', padding: 16 }}>
@@ -211,6 +213,18 @@ export default async function StoreHome({ searchParams }) {
       </div>
 
       <section style={{ marginTop: 18 }}>
+        <div style={{ fontWeight: 700, marginBottom: 8 }}>الحالة الحالية</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+          <StatCard label="بانتظار القبول" value={live.waiting} />
+          <StatCard label="قيد التجهيز" value={live.preparing} highlight={live.preparing > 0} />
+          <StatCard label="جاهزة للاستلام" value={live.ready} />
+        </div>
+        <div style={{ fontSize: 12, color: theme.muted, marginTop: 6 }}>
+          هاي الأرقام الحالية لكل طلباتك، وما بتتأثر بالفترة اللي تحت.
+        </div>
+      </section>
+
+      <section style={{ marginTop: 20 }}>
         <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
           {RANGES.map(([k, label]) => (
             <Link key={k} href={`/store?range=${k}`} style={chip(k === range)}>
