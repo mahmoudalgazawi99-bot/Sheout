@@ -25,19 +25,58 @@ export default function CartLink() {
   return (
     <Link
       href="/cart"
+      aria-label={t(lang, 'cart')}
       style={{
+        position: 'relative',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: 44,
+        height: 44,
+        borderRadius: '50%',
         background: theme.ink,
         color: theme.gold,
-        padding: '9px 16px',
-        borderRadius: 999,
-        fontSize: 13,
-        fontWeight: 600,
-        letterSpacing: lang === 'en' ? 0.5 : 0,
         textDecoration: 'none',
-        whiteSpace: 'nowrap',
+        flex: '0 0 auto',
       }}
     >
-      {t(lang, 'cart')} ({count})
+      <svg
+        width="22"
+        height="22"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <circle cx="9" cy="21" r="1" />
+        <circle cx="20" cy="21" r="1" />
+        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+      </svg>
+      {count > 0 && (
+        <span
+          style={{
+            position: 'absolute',
+            top: -4,
+            insetInlineEnd: -4,
+            minWidth: 20,
+            height: 20,
+            padding: '0 5px',
+            borderRadius: 999,
+            background: theme.gold,
+            color: theme.ink,
+            fontSize: 12,
+            fontWeight: 700,
+            lineHeight: '20px',
+            textAlign: 'center',
+            boxSizing: 'border-box',
+          }}
+        >
+          {count}
+        </span>
+      )}
     </Link>
   );
 }
