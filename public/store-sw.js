@@ -14,30 +14,43 @@ self.addEventListener('push', (event) => {
     data = {};
   }
 
-  const title = data.title || 'Sheout';
+  const isAdminTarget = String(data.url || '').startsWith('/admin');
+  const icon = isAdminTarget ? '/api/store/icon?size=192&variant=admin' : '/api/store/icon?size=192';
+
   const options = {
     body: data.body || '',
-    icon: '/api/store/icon?size=192',
-    badge: '/api/store/icon?size=192',
+    icon: icon,
+    badge: icon,
     data: { url: data.url || '/store' },
     dir: 'rtl',
     lang: 'ar',
   };
 
-  event.waitUntil(self.registration.showNotification(title, options));
+  event.waitUntil(self.registration.showNotification(data.title || 'Sheout', options));
 });
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const url = (event.notification.data && event.notification.data.url) || '/store';
+  const raw = (event.notification.data && event.notification.data.url) || '/store';
+  const target = new URL(raw, self.location.origin);
+  const section = self.location.origin + '/' + target.pathname.split('/')[1];
 
   event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async (list) => {
       for (const client of list) {
-        if ('focus' in client) return client.focus();
+        if (client.url.startsWith(section) && 'focus' in client) {
+          try {
+            await client.focus();
+            if (client.url !== target.href && 'navigate' in client) {
+              await client.navigate(target.href);
+            }
+          } catch (e) {}
+          return;
+        }
       }
-      if (self.clients.openWindow) return self.clients.openWindow(url);
-      return undefined;
+      if (self.clients.openWindow) {
+        await self.clients.openWindow(target.href);
+      }
     })
   );
 });
