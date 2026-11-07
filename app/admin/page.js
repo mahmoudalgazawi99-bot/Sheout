@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { isAdmin } from '@/lib/adminauth';
 import AdminLogout from '@/components/adminlogout';
+import PushSetup from '@/components/pushsetup';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,6 +27,34 @@ export default async function AdminPage() {
         <h1 style={{ margin: 0 }}>Orders</h1>
         <AdminLogout />
       </div>
+
+      <div style={{ margin: '12px 0' }}>
+        <Link
+          href="/admin/stores"
+          style={{
+            display: 'inline-block',
+            border: '1px solid #ddd',
+            borderRadius: 8,
+            padding: '8px 12px',
+            fontSize: 13,
+            color: '#111',
+            textDecoration: 'none',
+            background: '#fff',
+          }}
+        >
+          Store accounts
+        </Link>
+      </div>
+
+      <div dir="rtl">
+        <PushSetup
+          publicKey={process.env.VAPID_PUBLIC_KEY || ''}
+          apiBase="/api/admin/push"
+          swUrl="/store-sw.js"
+          scope="/admin"
+        />
+      </div>
+
       <p style={{ color: '#777', fontSize: 13 }}>{orders.length} latest orders</p>
 
       {orders.length === 0 && <p style={{ color: '#777' }}>No orders yet.</p>}
