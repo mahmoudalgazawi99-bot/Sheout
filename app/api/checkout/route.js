@@ -1,10 +1,41 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { sendToAccounts } from '@/lib/push';
 
 const DELIVERY_FEE = 3;
 
 const r2 = (n) => Math.round(n * 100) / 100;
 const bad = (message, status = 400) => NextResponse.json({ error: message }, { status });
+
+async function notifyStores(groups) {
+  try {
+    const storeIds = Object.keys(groups);
+    const { data: accounts } = await supabaseAdmin
+      .from('store_accounts')
+      .select('id, store_id')
+      .in('store_id', storeIds)
+      .eq('is_active', true);
+
+    const byStore = {};
+    (accounts ?? []).forEach((a) => {
+      if (!byStore[a.store_id]) byStore[a.store_id] = [];
+      byStore[a.store_id].push(a.id);
+    });
+
+    await Promise.all(
+      storeIds.map((sid) => {
+        const ids = byStore[sid];
+        if (!ids || ids.length === 0) return null;
+        const pieces = groups[sid].items.reduce((s, l) => s + l.qty, 0);
+        return sendToAccounts(ids, {
+          title: 'طلب جديد',
+          body: `وصلك طلب جديد (${pieces} ${pieces === 1 ? 'قطعة' : 'قطع'}) بانتظار القبول`,
+          url: '/store',
+        });
+      })
+    );
+  } catch {}
+}
 
 export async function POST(request) {
   let body;
@@ -149,6 +180,8 @@ export async function POST(request) {
       .update({ quantity: Number(p.quantity) - qtyByProduct[pid] })
       .eq('id', pid);
   }
+
+  await notifyStores(groups);
 
   return NextResponse.json({ orderId });
 }
