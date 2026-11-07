@@ -3,7 +3,9 @@ import { redirect } from 'next/navigation';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { isAdmin } from '@/lib/adminauth';
 import { computeAnalytics, LATE_HOURS } from '@/lib/analytics';
+import { computeLive } from '@/lib/live';
 import { Card, Section, BarList, ColumnChart } from '@/components/analyticsparts';
+import AutoRefresh from '@/components/autorefresh';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,7 +30,7 @@ export default async function AnalyticsPage({ searchParams }) {
 
   const sp = await searchParams;
   const raw = Array.isArray(sp?.range) ? sp.range[0] : sp?.range;
-  const range = RANGES.some(([k]) => k === raw) ? raw : '30';
+  const range = RANGES.some(([k]) => k === raw) ? raw : 'today';
 
   const { data } = await supabaseAdmin
     .from('orders')
@@ -40,6 +42,7 @@ export default async function AnalyticsPage({ searchParams }) {
 
   const orders = data ?? [];
   const a = computeAnalytics(orders, range);
+  const live = computeLive(orders);
 
   const statusKeys = [
     ...STATUS_ORDER.filter((k) => a.statusCounts[k]),
@@ -76,12 +79,26 @@ export default async function AnalyticsPage({ searchParams }) {
 
   return (
     <main style={{ maxWidth: 720, margin: '0 auto', padding: 16, fontFamily: 'sans-serif' }}>
+      <AutoRefresh seconds={30} />
+
       <Link href="/admin" style={{ color: '#111', textDecoration: 'none', fontSize: 14 }}>
         ← Back to orders
       </Link>
       <h1>Analytics</h1>
 
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      <div style={{ marginTop: 4 }}>
+        <div style={{ fontWeight: 700, marginBottom: 8 }}>Live now</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+          <Card label="Waiting for store" value={live.waiting} sub={`${live.waitingOrders} orders`} />
+          <Card label="In preparation" value={live.preparing} sub={`${live.preparingOrders} orders`} />
+          <Card label="Ready for pickup" value={live.ready} sub={`${live.readyOrders} orders`} />
+        </div>
+        <div style={{ fontSize: 12, color: '#777', marginTop: 6 }}>
+          Current state of all orders, not affected by the period below. Counts are store parts of orders. Refreshes every 30 seconds.
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 20 }}>
         {RANGES.map(([k, label]) => (
           <Link
             key={k}
