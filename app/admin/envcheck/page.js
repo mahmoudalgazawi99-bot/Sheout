@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import crypto from 'crypto';
 import { isAdmin } from '@/lib/adminauth';
+import CopyField from '@/components/copyfield';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,10 +27,23 @@ function inspect(check) {
   return { ...check, state: 'SET', length: v.length, hasSpaces, ok };
 }
 
+function derivePublicKey() {
+  try {
+    const priv = process.env.VAPID_PRIVATE_KEY;
+    if (!priv) return '';
+    const ecdh = crypto.createECDH('prime256v1');
+    ecdh.setPrivateKey(Buffer.from(priv, 'base64url'));
+    return ecdh.getPublicKey().toString('base64url');
+  } catch {
+    return '';
+  }
+}
+
 export default async function EnvCheckPage() {
   if (!(await isAdmin())) redirect('/admin/login');
 
   const rows = CHECKS.map(inspect);
+  const derived = derivePublicKey();
 
   return (
     <main style={{ maxWidth: 720, margin: '0 auto', padding: 16, fontFamily: 'sans-serif' }}>
@@ -36,7 +51,7 @@ export default async function EnvCheckPage() {
         ← Back to orders
       </Link>
       <h1>Env check</h1>
-      <p style={{ color: '#777', fontSize: 13 }}>Values are never shown. Only presence and length.</p>
+      <p style={{ color: '#777', fontSize: 13 }}>Secret values are never shown. Only presence and length.</p>
       {rows.map((r) => (
         <div
           key={r.name}
@@ -58,6 +73,18 @@ export default async function EnvCheckPage() {
           </div>
         </div>
       ))}
+
+      <h2 style={{ marginTop: 24 }}>Public key derived from the private key</h2>
+      {derived ? (
+        <>
+          <p style={{ color: '#777', fontSize: 13 }}>
+            This is the public key, safe to copy. Save it in Vercel as VAPID_PUBLIC_KEY.
+          </p>
+          <CopyField label="VAPID_PUBLIC_KEY" value={derived} />
+        </>
+      ) : (
+        <p style={{ color: '#b00' }}>Could not derive it. Check that VAPID_PRIVATE_KEY is set correctly.</p>
+      )}
     </main>
   );
 }
