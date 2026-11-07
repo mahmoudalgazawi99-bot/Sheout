@@ -12,7 +12,12 @@ function urlBase64ToUint8Array(base64String) {
   return out;
 }
 
-export default function PushSetup({ publicKey }) {
+export default function PushSetup({
+  publicKey,
+  apiBase = '/api/store/push',
+  swUrl = '/store-sw.js',
+  scope = '/store',
+}) {
   const [state, setState] = useState('loading');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
@@ -41,7 +46,7 @@ export default function PushSetup({ publicKey }) {
       }
 
       try {
-        await navigator.serviceWorker.register('/store-sw.js', { scope: '/store' });
+        await navigator.serviceWorker.register(swUrl, { scope });
         const reg = await navigator.serviceWorker.ready;
         if (Notification.permission === 'denied') {
           if (!cancelled) setState('denied');
@@ -58,7 +63,7 @@ export default function PushSetup({ publicKey }) {
     return () => {
       cancelled = true;
     };
-  }, [publicKey]);
+  }, [publicKey, swUrl, scope]);
 
   async function enable() {
     setBusy(true);
@@ -79,7 +84,7 @@ export default function PushSetup({ publicKey }) {
           applicationServerKey: urlBase64ToUint8Array(publicKey),
         });
       }
-      const res = await fetch('/api/store/push/subscribe', {
+      const res = await fetch(`${apiBase}/subscribe`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(sub.toJSON()),
@@ -100,7 +105,7 @@ export default function PushSetup({ publicKey }) {
     setBusy(true);
     setMessage('');
     try {
-      const res = await fetch('/api/store/push/test', { method: 'POST' });
+      const res = await fetch(`${apiBase}/test`, { method: 'POST' });
       const data = await res.json().catch(() => ({}));
       setMessage(res.ok ? 'تم إرسال الإشعار، شوف جوالك' : data.error || 'تعذّر إرسال الإشعار');
     } catch {
@@ -118,7 +123,7 @@ export default function PushSetup({ publicKey }) {
       if (sub) {
         const endpoint = sub.endpoint;
         await sub.unsubscribe();
-        await fetch('/api/store/push/unsubscribe', {
+        await fetch(`${apiBase}/unsubscribe`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ endpoint }),
@@ -179,7 +184,7 @@ export default function PushSetup({ publicKey }) {
 
       {state === 'denied' && (
         <p style={note}>
-          الإشعارات محظورة لهذا التطبيق. فعّلها من إعدادات الجهاز، ثم الإشعارات، ثم Sheout.
+          الإشعارات محظورة لهذا التطبيق. فعّلها من إعدادات الجهاز، ثم الإشعارات، ثم التطبيق.
         </p>
       )}
 
