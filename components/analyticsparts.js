@@ -50,33 +50,35 @@ export function ColumnChart({ items, format, labelEvery = 1 }) {
   const max = Math.max(1, ...items.map((i) => i.value));
   const width = items.length * 16;
   return (
-    <div style={{ overflowX: 'auto' }}>
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 120, minWidth: width }}>
-        {items.map((it, idx) => (
-          <div
-            key={idx}
-            title={`${it.label}: ${format(it.value)}`}
-            style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}
-          >
+    <div>
+      <div dir="ltr" style={{ overflowX: 'auto' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 120, minWidth: width }}>
+          {items.map((it, idx) => (
             <div
-              style={{
-                height: `${(it.value / max) * 100}%`,
-                minHeight: it.value > 0 ? 2 : 0,
-                background: '#b8924a',
-                borderRadius: 3,
-              }}
-            />
-          </div>
-        ))}
+              key={idx}
+              title={`${it.label}: ${format(it.value)}`}
+              style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}
+            >
+              <div
+                style={{
+                  height: `${(it.value / max) * 100}%`,
+                  minHeight: it.value > 0 ? 2 : 0,
+                  background: '#b8924a',
+                  borderRadius: 3,
+                }}
+              />
+            </div>
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: 4, minWidth: width }}>
+          {items.map((it, idx) => (
+            <div key={idx} style={{ flex: 1, fontSize: 10, color: '#777', textAlign: 'center' }}>
+              {idx % labelEvery === 0 ? it.label : ''}
+            </div>
+          ))}
+        </div>
       </div>
-      <div style={{ display: 'flex', gap: 4, minWidth: width }}>
-        {items.map((it, idx) => (
-          <div key={idx} style={{ flex: 1, fontSize: 10, color: '#777', textAlign: 'center' }}>
-            {idx % labelEvery === 0 ? it.label : ''}
-          </div>
-        ))}
-      </div>
-      <div style={{ fontSize: 12, color: '#777', marginTop: 6 }}>Highest: {format(max)}</div>
+      <div style={{ fontSize: 12, color: '#777', marginTop: 6 }}>الأعلى: {format(max)}</div>
     </div>
   );
 }
