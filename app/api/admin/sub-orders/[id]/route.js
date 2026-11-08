@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { isAdmin } from '@/lib/adminauth';
+import { stampsFor } from '@/lib/statusstamps';
 
 const STATUSES = ['new', 'confirmed', 'ready', 'delivered', 'cancelled'];
 
@@ -23,9 +24,19 @@ export async function PATCH(request, { params }) {
     return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
   }
 
+  const { data: current } = await supabaseAdmin
+    .from('sub_orders')
+    .select('id, confirmed_at, ready_at, delivered_at')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (!current) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+
   const { data: updated, error } = await supabaseAdmin
     .from('sub_orders')
-    .update({ status })
+    .update(stampsFor(status, current))
     .eq('id', id)
     .select('order_id')
     .maybeSingle();
