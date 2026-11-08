@@ -8,12 +8,21 @@ import AutoRefresh from '@/components/autorefresh';
 import PushSetup from '@/components/pushsetup';
 import StoreBell from '@/components/storebell';
 import { computeStoreStats, computeStoreLive } from '@/lib/storestats';
+import { computeStoreSpeed } from '@/lib/storespeed';
+import { summarizeStock, LOW_STOCK } from '@/lib/stock';
 import { sizeLabel, colorLabel } from '@/lib/i18n';
 import { theme } from '@/lib/theme';
 
 export const dynamic = 'force-dynamic';
 
 const money = (v) => `${Number(v).toFixed(2)} د.أ`;
+
+const durAr = (m) => {
+  if (m === null || m === undefined) return '—';
+  const t = Math.round(m);
+  if (t < 60) return `${t} دقيقة`;
+  return `${Math.floor(t / 60)} س ${t % 60} د`;
+};
 
 const RANGES = [
   ['today', 'اليوم'],
@@ -57,6 +66,14 @@ const chip = (active) => ({
   color: active ? theme.gold : theme.ink,
 });
 
+const boxStyle = {
+  background: theme.card,
+  border: `1px solid ${theme.line}`,
+  borderRadius: theme.radius,
+  boxShadow: theme.shadow,
+  padding: 12,
+};
+
 function StatCard({ label, value, sub, valueSize = 20, highlight = false }) {
   return (
     <div
@@ -76,19 +93,37 @@ function StatCard({ label, value, sub, valueSize = 20, highlight = false }) {
   );
 }
 
+function StockGroup({ title, rows, showQty, color }) {
+  if (rows.length === 0) return null;
+  return (
+    <div style={{ marginTop: 10 }}>
+      <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>
+        {title} ({rows.length})
+      </div>
+      {rows.map((p, i) => (
+        <div
+          key={p.id}
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            gap: 8,
+            padding: '7px 0',
+            borderTop: i === 0 ? 'none' : `1px solid ${theme.line}`,
+            fontSize: 14,
+          }}
+        >
+          <span>{p.name_ar || p.name}</span>
+          {showQty && <b style={{ color }}>{Number(p.quantity) || 0} قطعة</b>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function OrderCard({ so, showActions }) {
   const shortId = String(so.order_id).slice(0, 8).toUpperCase();
   return (
-    <div
-      style={{
-        background: theme.card,
-        border: `1px solid ${theme.line}`,
-        borderRadius: theme.radius,
-        boxShadow: theme.shadow,
-        padding: 14,
-        marginBottom: 12,
-      }}
-    >
+    <div style={{ ...boxStyle, padding: 14, marginBottom: 12 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <b>
           طلب <bdi style={{ color: theme.gold }}>#{shortId}</bdi>
@@ -151,15 +186,23 @@ export default async function StoreHome({ searchParams }) {
 
   const { data: statsData } = await supabaseAdmin
     .from('sub_orders')
-    .select('status, subtotal, created_at, order_items(quantity, price, products(name, name_ar))')
+    .select('status, subtotal, created_at, confirmed_at, ready_at, order_items(quantity, price, products(name, name_ar))')
     .eq('store_id', account.store_id)
     .order('created_at', { ascending: false })
     .limit(1000);
 
+  const { data: stockData } = await supabaseAdmin
+    .from('products')
+    .select('id, name, name_ar, quantity, status, order_items(count)')
+    .eq('store_id', account.store_id);
+
   const orders = data ?? [];
   const stats = computeStoreStats(statsData ?? [], range);
   const live = computeStoreLive(statsData ?? []);
+  const speed = computeStoreSpeed(statsData ?? [], range);
+  const stock = summarizeStock(stockData ?? []);
   const maxQty = stats.top[0] ? stats.top[0].qty : 1;
+  const hasStockAlerts = stock.out.length > 0 || stock.low.length > 0 || stock.never.length > 0;
 
   const byStatus = (s) => orders.filter((o) => o.status === s);
   const history = orders.filter((o) => o.status === 'delivered' || o.status === 'cancelled');
@@ -243,19 +286,12 @@ export default async function StoreHome({ searchParams }) {
             sub={stats.top[0] ? `${stats.top[0].qty} قطعة` : ''}
             valueSize={16}
           />
+          <StatCard label="متوسط وقت القبول" value={durAr(speed.accept)} valueSize={16} />
+          <StatCard label="متوسط وقت التجهيز" value={durAr(speed.prep)} valueSize={16} />
         </div>
 
         {stats.top.length > 1 && (
-          <div
-            style={{
-              marginTop: 10,
-              background: theme.card,
-              border: `1px solid ${theme.line}`,
-              borderRadius: theme.radius,
-              boxShadow: theme.shadow,
-              padding: 12,
-            }}
-          >
+          <div style={{ ...boxStyle, marginTop: 10 }}>
             <div style={{ fontWeight: 700, marginBottom: 8 }}>أكثر المنتجات طلباً</div>
             {stats.top.map((p, i) => (
               <div key={p.name} style={{ marginBottom: i === stats.top.length - 1 ? 0 : 10 }}>
@@ -280,10 +316,24 @@ export default async function StoreHome({ searchParams }) {
           </div>
         )}
 
-        <div style={{ fontSize: 12, color: theme.muted, marginTop: 8 }}>
-          الإحصائيات بتستثني الطلبات الملغية.
+        <div style={{ fontSize: 12, color: theme.muted, marginTop: 8, lineHeight: 1.7 }}>
+          الإحصائيات بتستثني الطلبات الملغية. وقت القبول والتجهيز بيُحسب للطلبات اللي تغيّرت حالتها بعد تفعيل هالميزة.
         </div>
       </section>
+
+      {hasStockAlerts && (
+        <section style={{ marginTop: 20 }}>
+          <div style={{ fontWeight: 700, marginBottom: 8 }}>تنبيهات المخزون</div>
+          <div style={boxStyle}>
+            <StockGroup title="نفد المخزون" rows={stock.out} showQty color="#b00" />
+            <StockGroup title={`مخزون منخفض (${LOW_STOCK} قطع أو أقل)`} rows={stock.low} showQty color="#b86a00" />
+            <StockGroup title="منتجات ما انطلبت أبداً" rows={stock.never} showQty={false} />
+            <div style={{ fontSize: 12, color: theme.muted, marginTop: 12 }}>
+              لتحديث الكميات تواصل مع إدارة المنصة.
+            </div>
+          </div>
+        </section>
+      )}
 
       {orders.length === 0 && <p style={{ color: theme.muted }}>لسا ما وصلك أي طلب.</p>}
 
