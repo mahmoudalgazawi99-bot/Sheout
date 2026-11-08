@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { sendToAccounts, sendToAdmins } from '@/lib/push';
+import { clientKey, isLimited } from '@/lib/ratelimit';
+import { normPhone } from '@/lib/analytics';
 
 const DELIVERY_FEE = 3;
 
@@ -82,6 +84,13 @@ export async function POST(request) {
       color: i.color ? String(i.color).slice(0, 30) : null,
       qty,
     });
+  }
+
+  const limitMessage = 'Could not place your order: too many attempts. Please wait a few minutes.';
+  if (await isLimited('order-ip:' + clientKey(request), 10, 600)) return bad(limitMessage, 429);
+  const phoneDigits = normPhone(phone);
+  if (phoneDigits && (await isLimited('order-phone:' + phoneDigits, 5, 3600))) {
+    return bad(limitMessage, 429);
   }
 
   const ids = [...new Set(lines.map((l) => l.productId))];
