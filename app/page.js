@@ -153,6 +153,12 @@ export default async function Home() {
           <ProductGrid products={offers} lang={lang} />
         </>
       )}
+
+      <div style={{ textAlign: 'center', margin: '36px 0 12px' }}>
+        <Link href="/track" style={{ color: theme.gold, fontWeight: 600, fontSize: 14 }}>
+          {lang === 'ar' ? 'تتبّع طلبك' : 'Track your order'}
+        </Link>
+      </div>
     </main>
   );
 }
