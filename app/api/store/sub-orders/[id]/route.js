@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { getStoreSession } from '@/lib/storeauth';
+import { stampsFor } from '@/lib/statusstamps';
 
 const NEXT = { new: 'confirmed', confirmed: 'ready' };
 
@@ -19,7 +20,7 @@ export async function PATCH(request, { params }) {
 
   const { data: sub } = await supabaseAdmin
     .from('sub_orders')
-    .select('id, status, order_id')
+    .select('id, status, order_id, confirmed_at, ready_at, delivered_at')
     .eq('id', id)
     .eq('store_id', account.store_id)
     .maybeSingle();
@@ -32,7 +33,7 @@ export async function PATCH(request, { params }) {
 
   const { data: updated, error } = await supabaseAdmin
     .from('sub_orders')
-    .update({ status: next })
+    .update(stampsFor(next, sub))
     .eq('id', id)
     .eq('status', sub.status)
     .select('order_id')
