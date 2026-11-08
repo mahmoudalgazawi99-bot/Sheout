@@ -1,47 +1,95 @@
 import Link from 'next/link';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import LangToggle from '@/components/LangToggle';
+import AutoRefresh from '@/components/autorefresh';
 import { getLang } from '@/lib/serverlang';
-import { t, money, pick, sizeLabel, colorLabel, statusLabel } from '@/lib/i18n';
+import { money, pick, sizeLabel, colorLabel } from '@/lib/i18n';
 import { theme } from '@/lib/theme';
 
 export const dynamic = 'force-dynamic';
 
+// Put the support phone number here to show it on the page (example: '0790000000')
+const SUPPORT_PHONE = '';
+
+const STAGES = ['new', 'confirmed', 'ready', 'delivered'];
+
+const LABELS = {
+  ar: {
+    new: 'تم استلام الطلب',
+    confirmed: 'قيد التجهيز',
+    ready: 'جاهز للتوصيل',
+    delivered: 'تم التوصيل',
+    cancelled: 'ملغي',
+  },
+  en: {
+    new: 'Order received',
+    confirmed: 'Preparing',
+    ready: 'Ready for delivery',
+    delivered: 'Delivered',
+    cancelled: 'Cancelled',
+  },
+};
+
+function firstImage(images) {
+  if (!Array.isArray(images) || images.length === 0) return null;
+  const first = images[0];
+  if (typeof first === 'string') return first;
+  if (first && typeof first === 'object' && first.url) return String(first.url);
+  return null;
+}
+
+function stageOf(subs) {
+  const active = subs.filter((s) => s.status !== 'cancelled');
+  if (subs.length > 0 && active.length === 0) return -1;
+  if (active.length === 0) return 0;
+  return Math.min(...active.map((s) => Math.max(0, STAGES.indexOf(s.status))));
+}
+
 export default async function OrderPage({ params }) {
   const lang = await getLang();
+  const ar = lang === 'ar';
+  const L = LABELS[ar ? 'ar' : 'en'];
   const { id } = await params;
 
   const { data: order } = await supabaseAdmin
     .from('orders')
-    .select('id, subtotal, delivery_fee, total, status, address, notes, payment_method, customers(name, phone)')
+    .select('id, subtotal, delivery_fee, total')
     .eq('id', id)
     .maybeSingle();
 
   const wrap = { maxWidth: 720, margin: '0 auto', padding: 16 };
+  const back = (
+    <Link href="/" style={{ color: theme.ink, textDecoration: 'none', fontSize: 14 }}>
+      {ar ? '→ ' : '← '}
+      {ar ? 'العودة إلى SHEOUT' : 'Back to SHEOUT'}
+    </Link>
+  );
 
   if (!order) {
     return (
       <main style={wrap}>
-        <Link href="/" style={{ color: theme.ink, textDecoration: 'none', fontSize: 14 }}>
-          {lang === 'ar' ? '→ ' : '← '}
-          {t(lang, 'backTo')}
-        </Link>
-        <h2 style={{ fontFamily: theme.serif }}>{t(lang, 'orderNotFound')}</h2>
+        {back}
+        <h2 style={{ fontFamily: theme.serif }}>{ar ? 'الطلب غير موجود' : 'Order not found'}</h2>
       </main>
     );
   }
 
   const { data: subOrders } = await supabaseAdmin
     .from('sub_orders')
-    .select('id, order_items(quantity, price, size, color, products(name, name_ar))')
+    .select('id, status, order_items(quantity, price, size, color, products(name, name_ar, images))')
     .eq('order_id', id);
 
-  const items = (subOrders ?? []).flatMap((so) => so.order_items ?? []);
+  const subs = subOrders ?? [];
+  const stage = stageOf(subs);
+  const items = subs.flatMap((so) => (so.order_items ?? []).map((it) => ({ ...it, status: so.status })));
   const shortId = String(order.id).slice(0, 8).toUpperCase();
 
   return (
     <main style={wrap}>
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+      <AutoRefresh seconds={30} />
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        {back}
         <LangToggle />
       </div>
 
@@ -60,30 +108,70 @@ export default async function OrderPage({ params }) {
         >
           ✓
         </div>
-        <h1 style={{ fontFamily: theme.serif, fontSize: 30, fontWeight: 600, margin: 0 }}>{t(lang, 'thankYou')}</h1>
+        <h1 style={{ fontFamily: theme.serif, fontSize: 30, fontWeight: 600, margin: 0 }}>
+          {ar ? 'شكراً لك!' : 'Thank you!'}
+        </h1>
         <p style={{ color: theme.muted, margin: '8px 0 0' }}>
-          {lang === 'ar' ? 'تم استلام طلبك رقم ' : 'Your order '}
+          {ar ? 'رقم طلبك ' : 'Your order number '}
           <bdi style={{ color: theme.gold, fontWeight: 700 }}>#{shortId}</bdi>
-          {lang === 'ar' ? '. الدفع عند الاستلام.' : ' has been placed. Payment on delivery.'}
+          {ar ? '. الدفع عند الاستلام.' : '. Payment on delivery.'}
         </p>
       </div>
 
-      <div
+      <section
         style={{
-          fontSize: 14,
-          lineHeight: 1.9,
-          background: theme.goldSoft,
+          background: theme.card,
+          border: `1px solid ${theme.line}`,
           borderRadius: theme.radius,
-          padding: '12px 16px',
+          boxShadow: theme.shadow,
+          padding: 16,
           marginBottom: 16,
         }}
       >
-        <div>{t(lang, 'name')}: {order.customers?.name}</div>
-        <div>{t(lang, 'phone')}: <bdi>{order.customers?.phone}</bdi></div>
-        <div>{t(lang, 'address')}: {order.address}</div>
-        {order.notes && <div>{lang === 'ar' ? 'ملاحظات' : 'Notes'}: {order.notes}</div>}
-        <div>{t(lang, 'status')}: {statusLabel(lang, order.status)}</div>
-      </div>
+        {stage === -1 ? (
+          <div style={{ textAlign: 'center', color: '#b00', fontWeight: 700 }}>
+            {ar ? 'تم إلغاء الطلب' : 'This order was cancelled'}
+          </div>
+        ) : (
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 4 }}>
+            {STAGES.map((s, i) => {
+              const done = i <= stage;
+              return (
+                <div key={s} style={{ flex: 1, textAlign: 'center' }}>
+                  <div
+                    style={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: '50%',
+                      margin: '0 auto 6px',
+                      background: done ? theme.ink : theme.card,
+                      color: done ? theme.gold : theme.muted,
+                      border: `2px solid ${done ? theme.ink : theme.line}`,
+                      lineHeight: '24px',
+                      fontSize: 14,
+                      boxSizing: 'border-box',
+                    }}
+                  >
+                    {done ? '✓' : i + 1}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: done ? theme.ink : theme.muted,
+                      fontWeight: i === stage ? 700 : 400,
+                    }}
+                  >
+                    {L[s]}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        <div style={{ fontSize: 12, color: theme.muted, marginTop: 12, textAlign: 'center' }}>
+          {ar ? 'بتتحدث الحالة تلقائياً.' : 'The status updates automatically.'}
+        </div>
+      </section>
 
       <section
         style={{
@@ -95,51 +183,89 @@ export default async function OrderPage({ params }) {
           marginBottom: 14,
         }}
       >
-        {items.map((it, idx) => (
-          <div
-            key={idx}
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              fontSize: 14,
-              padding: '10px 0',
-              borderTop: idx === 0 ? 'none' : `1px solid ${theme.line}`,
-            }}
-          >
-            <div>
-              {it.products ? pick(lang, it.products.name, it.products.name_ar) : ''} × {it.quantity}
-              <div style={{ fontSize: 12, color: theme.muted }}>
-                {[it.size ? sizeLabel(lang, it.size) : '', it.color ? colorLabel(lang, it.color) : '']
-                  .filter(Boolean)
-                  .join(' / ')}
+        {items.map((it, idx) => {
+          const p = it.products;
+          const name = p ? pick(lang, p.name, p.name_ar) : '';
+          const details = [it.size ? sizeLabel(lang, it.size) : '', it.color ? colorLabel(lang, it.color) : '']
+            .filter(Boolean)
+            .join(' / ');
+          return (
+            <div
+              key={idx}
+              style={{
+                display: 'flex',
+                gap: 12,
+                padding: '12px 0',
+                borderTop: idx === 0 ? 'none' : `1px solid ${theme.line}`,
+              }}
+            >
+              <img
+                src={(p && firstImage(p.images)) || ''}
+                alt={name}
+                style={{ width: 56, height: 68, objectFit: 'cover', borderRadius: 10, background: theme.goldSoft }}
+              />
+              <div style={{ flex: 1, fontSize: 14 }}>
+                <b>
+                  {name} × {it.quantity}
+                </b>
+                {details && <div style={{ fontSize: 12, color: theme.muted }}>{details}</div>}
+                <div
+                  style={{
+                    fontSize: 12,
+                    marginTop: 4,
+                    color: it.status === 'cancelled' ? '#b00' : theme.gold,
+                    fontWeight: 600,
+                  }}
+                >
+                  {L[it.status] || it.status}
+                </div>
               </div>
+              <b style={{ fontSize: 14 }}>{money(lang, it.price * it.quantity)}</b>
             </div>
-            <b>{money(lang, it.price * it.quantity)}</b>
-          </div>
-        ))}
+          );
+        })}
       </section>
 
       <div style={{ borderTop: `2px solid ${theme.ink}`, paddingTop: 14, lineHeight: 1.9 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <span>{t(lang, 'items')}</span>
+          <span>{ar ? 'المنتجات' : 'Items'}</span>
           <span>{money(lang, order.subtotal)}</span>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <span>{t(lang, 'delivery')}</span>
+          <span>{ar ? 'التوصيل' : 'Delivery'}</span>
           <span>{money(lang, order.delivery_fee)}</span>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 20 }}>
-          <b style={{ fontFamily: theme.serif }}>{t(lang, 'total')}</b>
+          <b style={{ fontFamily: theme.serif }}>{ar ? 'المجموع' : 'Total'}</b>
           <b>{money(lang, order.total)}</b>
         </div>
       </div>
+
+      <p style={{ fontSize: 13, color: theme.muted, lineHeight: 1.8, marginTop: 18 }}>
+        {ar
+          ? 'احتفظ برقم طلبك. بتقدر تتابع حالته أي وقت من صفحة '
+          : 'Keep your order number. You can follow its status anytime from the '}
+        <Link href="/track" style={{ color: theme.gold, fontWeight: 600 }}>
+          {ar ? 'تتبّع طلبك' : 'Track your order'}
+        </Link>
+        .
+        {SUPPORT_PHONE ? (
+          <>
+            {' '}
+            {ar ? 'للاستفسار: ' : 'Questions: '}
+            <a href={`tel:${SUPPORT_PHONE}`} dir="ltr" style={{ color: theme.ink, fontWeight: 600 }}>
+              {SUPPORT_PHONE}
+            </a>
+          </>
+        ) : null}
+      </p>
 
       <Link
         href="/"
         style={{
           display: 'block',
           textAlign: 'center',
-          marginTop: 22,
+          marginTop: 16,
           padding: 16,
           borderRadius: 999,
           background: theme.ink,
@@ -148,7 +274,7 @@ export default async function OrderPage({ params }) {
           textDecoration: 'none',
         }}
       >
-        {t(lang, 'continueShopping')}
+        {ar ? 'متابعة التسوق' : 'Continue shopping'}
       </Link>
     </main>
   );
