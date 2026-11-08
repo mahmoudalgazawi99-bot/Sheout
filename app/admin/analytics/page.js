@@ -6,6 +6,7 @@ import { computeAnalytics, LATE_HOURS } from '@/lib/analytics';
 import { computeLive } from '@/lib/live';
 import { computeSpeed } from '@/lib/speed';
 import { summarizeStock, LOW_STOCK } from '@/lib/stock';
+import { t, money, statusLabel } from '@/lib/i18n';
 import { Card, Section, BarList, ColumnChart } from '@/components/analyticsparts';
 import AutoRefresh from '@/components/autorefresh';
 
@@ -14,22 +15,25 @@ export const dynamic = 'force-dynamic';
 const COMMISSION_RATE = 0.15;
 
 const RANGES = [
-  ['today', 'Today'],
-  ['7', '7 days'],
-  ['30', '30 days'],
-  ['all', 'All'],
+  ['today', 'اليوم'],
+  ['7', '7 أيام'],
+  ['30', '30 يوم'],
+  ['all', 'الكل'],
 ];
 
 const STATUS_ORDER = ['new', 'processing', 'delivered', 'cancelled'];
+const CATS = ['Women', 'Men', 'Kids', 'Shoes', 'Sports', 'Accessories'];
 
-const jd = (v) => `${Number(v).toFixed(2)} JD`;
+const jd = (v) => money('ar', v);
 const num = (v) => String(v);
-const hoursText = (h) => (h >= 24 ? `${Math.floor(h / 24)}d ${Math.floor(h % 24)}h` : `${Math.floor(h)}h`);
+const pcs = (v) => `${v} قطعة`;
+const hoursText = (h) =>
+  h >= 24 ? `${Math.floor(h / 24)} يوم ${Math.floor(h % 24)} س` : `${Math.floor(h)} س`;
 const dur = (m) => {
   if (m === null || m === undefined) return '—';
-  const t = Math.round(m);
-  if (t < 60) return `${t} min`;
-  return `${Math.floor(t / 60)}h ${t % 60}m`;
+  const mins = Math.round(m);
+  if (mins < 60) return `${mins} دقيقة`;
+  return `${Math.floor(mins / 60)} س ${mins % 60} د`;
 };
 
 export default async function AnalyticsPage({ searchParams }) {
@@ -49,7 +53,22 @@ export default async function AnalyticsPage({ searchParams }) {
 
   const { data: stockData } = await supabaseAdmin
     .from('products')
-    .select('id, name, quantity, status, stores(name), order_items(count)');
+    .select('id, name, name_ar, quantity, status, stores(name, name_ar), order_items(count)');
+
+  const { data: storeNames } = await supabaseAdmin.from('stores').select('name, name_ar');
+  const { data: productNames } = await supabaseAdmin.from('products').select('name, name_ar');
+
+  const storeAr = {};
+  (storeNames ?? []).forEach((s) => {
+    storeAr[s.name] = s.name_ar || s.name;
+  });
+  const productAr = {};
+  (productNames ?? []).forEach((p) => {
+    productAr[p.name] = p.name_ar || p.name;
+  });
+  const sn = (n) => storeAr[n] || n;
+  const pn = (n) => productAr[n] || n;
+  const cn = (c) => (CATS.includes(c) ? t('ar', c) : c);
 
   const orders = data ?? [];
   const a = computeAnalytics(orders, range);
@@ -83,7 +102,7 @@ export default async function AnalyticsPage({ searchParams }) {
           style={{ ...rowStyle(i), color: '#111', textDecoration: 'none' }}
         >
           <span>
-            #{String(r.orderId).slice(0, 8).toUpperCase()} · {r.store}
+            <bdi>#{String(r.orderId).slice(0, 8).toUpperCase()}</bdi> · {sn(r.store)}
           </span>
           <b>{hoursText(r.hours)}</b>
         </Link>
@@ -94,33 +113,35 @@ export default async function AnalyticsPage({ searchParams }) {
     list.map((p, i) => (
       <div key={p.id} style={rowStyle(i)}>
         <span>
-          {p.name} · <span style={{ color: '#777' }}>{p.stores ? p.stores.name : '—'}</span>
+          {p.name_ar || p.name} ·{' '}
+          <span style={{ color: '#777' }}>{p.stores ? p.stores.name_ar || p.stores.name : '—'}</span>
         </span>
-        {showQty && <b style={{ color }}>{Number(p.quantity) || 0} left</b>}
+        {showQty && <b style={{ color }}>{Number(p.quantity) || 0} قطعة متبقية</b>}
       </div>
     ));
 
   const groupTitle = { fontWeight: 700, margin: '4px 0 6px', fontSize: 14 };
   const stockEmpty = stock.out.length === 0 && stock.low.length === 0 && stock.never.length === 0;
+  const pctCommission = Math.round(COMMISSION_RATE * 100);
 
   return (
-    <main style={{ maxWidth: 720, margin: '0 auto', padding: 16, fontFamily: 'sans-serif' }}>
+    <main dir="rtl" lang="ar" style={{ maxWidth: 720, margin: '0 auto', padding: 16, fontFamily: 'sans-serif' }}>
       <AutoRefresh seconds={30} />
 
       <Link href="/admin" style={{ color: '#111', textDecoration: 'none', fontSize: 14 }}>
-        ← Back to orders
+        → العودة إلى الطلبات
       </Link>
-      <h1>Analytics</h1>
+      <h1>التحليلات</h1>
 
       <div style={{ marginTop: 4 }}>
-        <div style={{ fontWeight: 700, marginBottom: 8 }}>Live now</div>
+        <div style={{ fontWeight: 700, marginBottom: 8 }}>الوضع الحالي</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
-          <Card label="Waiting for store" value={live.waiting} sub={`${live.waitingOrders} orders`} />
-          <Card label="In preparation" value={live.preparing} sub={`${live.preparingOrders} orders`} />
-          <Card label="Ready for pickup" value={live.ready} sub={`${live.readyOrders} orders`} />
+          <Card label="بانتظار المحل" value={live.waiting} sub={`${live.waitingOrders} طلب`} />
+          <Card label="قيد التجهيز" value={live.preparing} sub={`${live.preparingOrders} طلب`} />
+          <Card label="جاهزة للاستلام" value={live.ready} sub={`${live.readyOrders} طلب`} />
         </div>
-        <div style={{ fontSize: 12, color: '#777', marginTop: 6 }}>
-          Current state of all orders, not affected by the period below. Counts are store parts of orders. Refreshes every 30 seconds.
+        <div style={{ fontSize: 12, color: '#777', marginTop: 6, lineHeight: 1.7 }}>
+          الحالة الحالية لكل الطلبات، وما بتتأثر بالفترة اللي تحت. الأرقام بتعد أجزاء الطلبات لكل محل. وبتتحدث كل 30 ثانية.
         </div>
       </div>
 
@@ -145,58 +166,58 @@ export default async function AnalyticsPage({ searchParams }) {
       </div>
 
       {orders.length >= 1000 && (
-        <p style={{ color: '#b00', fontSize: 13 }}>The analysis covers the latest 1000 orders only.</p>
+        <p style={{ color: '#b00', fontSize: 13 }}>التحليل بيغطي آخر 1000 طلب بس.</p>
       )}
 
       <div style={{ ...grid, marginTop: 16 }}>
-        <Card label="Orders" value={a.count} sub={`${a.activeOrders} not cancelled`} />
-        <Card label="Total sales" value={jd(a.totalSales)} sub="Products + delivery" />
-        <Card label="Product sales" value={jd(a.productSales)} />
-        <Card label="Delivery fees" value={jd(a.deliveryFees)} />
+        <Card label="الطلبات" value={a.count} sub={`${a.activeOrders} غير ملغية`} />
+        <Card label="إجمالي المبيعات" value={jd(a.totalSales)} sub="المنتجات + التوصيل" />
+        <Card label="مبيعات المنتجات" value={jd(a.productSales)} />
+        <Card label="رسوم التوصيل" value={jd(a.deliveryFees)} />
         <Card
-          label="Platform revenue"
+          label="إيراد المنصة"
           value={jd(a.productSales * COMMISSION_RATE + a.deliveryFees)}
-          sub={`${Math.round(COMMISSION_RATE * 100)}% commission + delivery`}
+          sub={`عمولة ${pctCommission}% + التوصيل`}
         />
         <Card
-          label="Owed to stores"
+          label="المستحق للمحلات"
           value={jd(a.productSales * (1 - COMMISSION_RATE))}
-          sub={`${Math.round((1 - COMMISSION_RATE) * 100)}% of product sales`}
+          sub={`${100 - pctCommission}% من مبيعات المنتجات`}
         />
-        <Card label="Average order" value={jd(a.avgOrder)} />
-        <Card label="Pieces sold" value={a.pieces} />
-        <Card label="Customers" value={a.customers} sub={`${a.newCustomers} new · ${a.repeatCustomers} repeat`} />
-        <Card label="Cancellation rate" value={`${a.cancelRate}%`} />
+        <Card label="متوسط الطلب" value={jd(a.avgOrder)} />
+        <Card label="القطع المباعة" value={a.pieces} />
+        <Card label="الزبائن" value={a.customers} sub={`${a.newCustomers} جديد · ${a.repeatCustomers} متكرر`} />
+        <Card label="نسبة الإلغاء" value={`${a.cancelRate}%`} />
       </div>
 
-      <Section title="Orders by status">
+      <Section title="الطلبات حسب الحالة">
         {statusKeys.length === 0 ? (
-          <p style={{ color: '#777', margin: 0 }}>No orders in this period.</p>
+          <p style={{ color: '#777', margin: 0 }}>ما في طلبات بهالفترة.</p>
         ) : (
           <BarList
-            rows={statusKeys.map((k) => ({ label: k, value: a.statusCounts[k] }))}
+            rows={statusKeys.map((k) => ({ label: statusLabel('ar', k), value: a.statusCounts[k] }))}
             format={num}
           />
         )}
       </Section>
 
-      <Section title="Speed">
+      <Section title="السرعة">
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
-          <Card label="Accept time" value={dur(speed.overall.accept)} sub="Order to accepted" />
-          <Card label="Prep time" value={dur(speed.overall.prep)} sub="Accepted to ready" />
-          <Card label="Pickup to delivery" value={dur(speed.overall.pickup)} sub="Ready to delivered" />
+          <Card label="وقت القبول" value={dur(speed.overall.accept)} sub="من الطلب للقبول" />
+          <Card label="وقت التجهيز" value={dur(speed.overall.prep)} sub="من القبول لجاهز" />
+          <Card label="الاستلام والتوصيل" value={dur(speed.overall.pickup)} sub="من جاهز لتم التوصيل" />
         </div>
 
         {speed.stores.length > 0 && (
           <div style={{ marginTop: 14 }}>
-            <div style={groupTitle}>Stores, fastest to accept first</div>
+            <div style={groupTitle}>المحلات، الأسرع بالقبول أولاً</div>
             {speed.stores.map((s, i) => (
               <div key={s.name} style={rowStyle(i)}>
                 <span>
-                  {i + 1}. {s.name}
+                  {i + 1}. {sn(s.name)}
                 </span>
                 <span>
-                  <b>{dur(s.accept)}</b> accept · <b>{dur(s.prep)}</b> prep
+                  <b>{dur(s.accept)}</b> قبول · <b>{dur(s.prep)}</b> تجهيز
                 </span>
               </div>
             ))}
@@ -204,12 +225,12 @@ export default async function AnalyticsPage({ searchParams }) {
         )}
 
         <p style={{ color: '#777', fontSize: 12, margin: '12px 0 0', lineHeight: 1.7 }}>
-          Averages in minutes. Tracked only for orders whose status changed after this feature was added, so older orders are not included.
+          المتوسطات بالدقائق. بتُحسب بس للطلبات اللي تغيّرت حالتها بعد تفعيل هالميزة، فالطلبات القديمة ما بتدخل.
         </p>
       </Section>
 
       {a.days.length > 1 && (
-        <Section title="Sales per day">
+        <Section title="المبيعات اليومية">
           <ColumnChart
             items={a.days.map((d) => ({ label: d.key.slice(8), value: d.sales }))}
             format={jd}
@@ -218,7 +239,7 @@ export default async function AnalyticsPage({ searchParams }) {
         </Section>
       )}
 
-      <Section title="Peak hours (Amman time)">
+      <Section title="أوقات الذروة (بتوقيت عمّان)">
         <ColumnChart
           items={a.hours.map((v, h) => ({ label: String(h), value: v }))}
           format={num}
@@ -226,65 +247,67 @@ export default async function AnalyticsPage({ searchParams }) {
         />
       </Section>
 
-      <Section title="Store performance">
+      <Section title="أداء المحلات">
         {a.stores.length === 0 ? (
-          <p style={{ color: '#777', margin: 0 }}>No data.</p>
+          <p style={{ color: '#777', margin: 0 }}>ما في بيانات.</p>
         ) : (
           <BarList
             rows={a.stores.map((s) => ({
-              label: s.name,
+              label: sn(s.name),
               value: s.amount,
-              note: `${s.orders} orders · ${s.pieces} pieces · ${s.cancelled} cancelled`,
+              note: `${s.orders} طلب · ${s.pieces} قطعة · ${s.cancelled} ملغي`,
             }))}
             format={jd}
           />
         )}
       </Section>
 
-      <Section title="Top products (by pieces)">
+      <Section title="أكثر المنتجات مبيعاً (بالقطع)">
         {a.products.length === 0 ? (
-          <p style={{ color: '#777', margin: 0 }}>No data.</p>
+          <p style={{ color: '#777', margin: 0 }}>ما في بيانات.</p>
         ) : (
           <BarList
-            rows={a.products.map((p) => ({ label: p.name, value: p.qty, note: jd(p.amount) }))}
-            format={(v) => `${v} pcs`}
+            rows={a.products.map((p) => ({ label: pn(p.name), value: p.qty, note: jd(p.amount) }))}
+            format={pcs}
           />
         )}
       </Section>
 
-      <Section title="Sales by category">
+      <Section title="المبيعات حسب القسم">
         {a.categories.length === 0 ? (
-          <p style={{ color: '#777', margin: 0 }}>No data.</p>
+          <p style={{ color: '#777', margin: 0 }}>ما في بيانات.</p>
         ) : (
           <BarList
-            rows={a.categories.map((c) => ({ label: c.name, value: c.amount, note: `${c.qty} pieces` }))}
+            rows={a.categories.map((c) => ({ label: cn(c.name), value: c.amount, note: pcs(c.qty) }))}
             format={jd}
           />
         )}
       </Section>
 
-      <Section title="Stock alerts">
+      <Section title="تنبيهات المخزون">
         {stockEmpty ? (
-          <p style={{ color: '#177a3c', margin: 0, fontSize: 14 }}>Everything is in stock and has been ordered at least once.</p>
+          <p style={{ color: '#177a3c', margin: 0, fontSize: 14 }}>
+            كل المنتجات متوفرة وانطلبت مرة وحدة على الأقل.
+          </p>
         ) : (
           <div>
             {stock.out.length > 0 && (
               <div>
-                <div style={groupTitle}>Out of stock ({stock.out.length})</div>
+                <div style={groupTitle}>نفد المخزون ({stock.out.length})</div>
                 {stockRows(stock.out, true, '#b00')}
               </div>
             )}
             {stock.low.length > 0 && (
               <div style={{ marginTop: 10 }}>
                 <div style={groupTitle}>
-                  Low stock, {LOW_STOCK} or fewer ({stock.low.length})
+                  مخزون منخفض ({LOW_STOCK} قطع أو أقل) ({stock.low.length})
                 </div>
                 {stockRows(stock.low, true, '#b86a00')}
               </div>
             )}
             {stock.never.length > 0 && (
               <div style={{ marginTop: 10 }}>
-                <div style={groupTitle}>Never ordered ({stock.never.length})</div>
+                <div style={groupTitle}>منتجات ما انطلبت أبداً ({stock.never.length})</div>
                 {stockRows(stock.never, false)}
               </div>
             )}
@@ -292,18 +315,18 @@ export default async function AnalyticsPage({ searchParams }) {
         )}
       </Section>
 
-      <Section title={`Waiting for the store over ${LATE_HOURS}h (all time)`}>
-        {attention(a.lateNew, 'Nothing is waiting.')}
+      <Section title={`بانتظار المحل أكثر من ${LATE_HOURS} ساعة (كل الوقت)`}>
+        {attention(a.lateNew, 'ما في شي بانتظار.')}
       </Section>
 
-      <Section title="Ready for pickup (all time)">
-        {attention(a.ready, 'Nothing is waiting for pickup.')}
+      <Section title="جاهزة للاستلام (كل الوقت)">
+        {attention(a.ready, 'ما في شي بانتظار الاستلام.')}
       </Section>
 
-      <p style={{ color: '#777', fontSize: 12, marginTop: 20, lineHeight: 1.7 }}>
-        Sales exclude cancelled orders and cancelled store parts. Total sales = product sales + delivery fees.
-        Platform revenue = commission on product sales + delivery fees. New customers = first order in this period.
-        Repeat = more than one order overall. Never ordered = no order line at all, cancelled or not.
+      <p style={{ color: '#777', fontSize: 12, marginTop: 20, lineHeight: 1.8 }}>
+        المبيعات بتستثني الطلبات الملغية وأجزاء المحلات الملغية. إجمالي المبيعات = مبيعات المنتجات + رسوم التوصيل.
+        إيراد المنصة = العمولة على مبيعات المنتجات + رسوم التوصيل. الزبون الجديد = أول طلب إله بهالفترة، والمتكرر = أكثر من طلب بشكل عام.
+        المنتج اللي "ما انطلب أبداً" يعني ما إله ولا سطر طلب، حتى الملغي.
       </p>
     </main>
   );
