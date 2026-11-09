@@ -50,7 +50,7 @@ function fmt(v) {
 const SECTIONS = [
   { key: 'new', title: 'طلبات جديدة', hint: 'اقبل الطلب لتأكيد توفر المنتج' },
   { key: 'confirmed', title: 'قيد التجهيز', hint: 'اضغط "جاهز للاستلام" لما تخلص التجهيز' },
-  { key: 'ready', title: 'جاهزة للاستلام', hint: 'بانتظار مندوب المنصة' },
+  { key: 'ready', title: 'جاهزة للاستلام', hint: 'اكتب رقم الطلب على الطرد وسلّمه لمندوب المنصة' },
 ];
 
 const HISTORY_LABEL = { delivered: 'تم التوصيل', cancelled: 'ملغي' };
@@ -112,7 +112,12 @@ function StockGroup({ title, rows, showQty, color }) {
             fontSize: 14,
           }}
         >
-          <span>{p.name_ar || p.name}</span>
+          <span>
+            {p.name_ar || p.name}
+            {p.product_no ? (
+              <span style={{ color: theme.muted, fontSize: 12 }}> · رقم {p.product_no}</span>
+            ) : null}
+          </span>
           {showQty && <b style={{ color }}>{Number(p.quantity) || 0} قطعة</b>}
         </div>
       ))}
@@ -121,15 +126,34 @@ function StockGroup({ title, rows, showQty, color }) {
 }
 
 function OrderCard({ so, showActions }) {
-  const shortId = String(so.order_id).slice(0, 8).toUpperCase();
+  const orderNo = (so.orders && so.orders.order_no) || String(so.order_id).slice(0, 8).toUpperCase();
   return (
     <div style={{ ...boxStyle, padding: 14, marginBottom: 12 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
         <b>
-          طلب <bdi style={{ color: theme.gold }}>#{shortId}</bdi>
+          طلب{' '}
+          <bdi dir="ltr" style={{ color: theme.gold }}>
+            {orderNo}
+          </bdi>
         </b>
         <span style={{ fontSize: 12, color: theme.muted }}>{fmt(so.created_at)}</span>
       </div>
+
+      {so.parts_total > 1 && (
+        <div
+          style={{
+            display: 'inline-block',
+            marginTop: 8,
+            padding: '4px 12px',
+            borderRadius: 999,
+            background: theme.goldSoft,
+            fontSize: 13,
+            fontWeight: 600,
+          }}
+        >
+          الطرد {so.part_no} من {so.parts_total}
+        </div>
+      )}
 
       {(so.order_items ?? []).map((it, idx) => {
         const p = it.products;
@@ -149,6 +173,9 @@ function OrderCard({ so, showActions }) {
             />
             <div style={{ flex: 1 }}>
               <b style={{ fontSize: 14 }}>{name}</b>
+              {p && p.product_no ? (
+                <div style={{ fontSize: 12, color: theme.muted }}>رقم المنتج: {p.product_no}</div>
+              ) : null}
               {details && <div style={{ fontSize: 13, color: theme.muted }}>{details}</div>}
               <div style={{ fontSize: 14, marginTop: 4 }}>
                 الكمية: <b>{it.quantity}</b>
@@ -179,7 +206,9 @@ export default async function StoreHome({ searchParams }) {
 
   const { data } = await supabaseAdmin
     .from('sub_orders')
-    .select('id, order_id, status, subtotal, created_at, order_items(quantity, size, color, products(name, name_ar, images))')
+    .select(
+      'id, order_id, part_no, parts_total, status, subtotal, created_at, orders(order_no), order_items(quantity, size, color, products(name, name_ar, images, product_no))'
+    )
     .eq('store_id', account.store_id)
     .order('created_at', { ascending: false })
     .limit(60);
@@ -193,7 +222,7 @@ export default async function StoreHome({ searchParams }) {
 
   const { data: stockData } = await supabaseAdmin
     .from('products')
-    .select('id, name, name_ar, quantity, status, order_items(count)')
+    .select('id, name, name_ar, product_no, quantity, status, order_items(count)')
     .eq('store_id', account.store_id);
 
   const orders = data ?? [];
