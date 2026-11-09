@@ -16,7 +16,9 @@ export default async function AdminOrderPage({ params }) {
 
   const { data: order } = await supabaseAdmin
     .from('orders')
-    .select('id, subtotal, delivery_fee, total, status, address, notes, payment_method, created_at, customers(name, phone)')
+    .select(
+      'id, order_no, subtotal, delivery_fee, total, status, address, notes, payment_method, created_at, customers(name, phone, member_no)'
+    )
     .eq('id', id)
     .maybeSingle();
 
@@ -38,16 +40,24 @@ export default async function AdminOrderPage({ params }) {
 
   const { data: subOrders } = await supabaseAdmin
     .from('sub_orders')
-    .select('id, subtotal, status, stores(name, phone), order_items(quantity, price, size, color, products(name))')
-    .eq('order_id', id);
+    .select(
+      'id, subtotal, status, part_no, parts_total, stores(name, phone), order_items(quantity, price, size, color, products(name, product_no))'
+    )
+    .eq('order_id', id)
+    .order('part_no', { ascending: true });
+
+  const orderNo = order.order_no || String(order.id).slice(0, 8).toUpperCase();
 
   return (
     <main style={wrap}>
       {back}
-      <h1 style={{ marginBottom: 4 }}>Order #{String(order.id).slice(0, 8).toUpperCase()}</h1>
+      <h1 style={{ marginBottom: 4 }}>Order #{orderNo}</h1>
       <div style={{ fontSize: 14, lineHeight: 1.8, marginBottom: 12 }}>
         <div>Placed: {when(order.created_at)}</div>
-        <div>Customer: {order.customers?.name} · {order.customers?.phone}</div>
+        <div>
+          Customer: {order.customers?.name} · {order.customers?.phone}
+          {order.customers?.member_no ? ` · member ${order.customers.member_no}` : ''}
+        </div>
         <div>Address: {order.address}</div>
         {order.notes && <div>Notes: {order.notes}</div>}
         <div>Payment: {order.payment_method === 'cod' ? 'Cash on delivery' : order.payment_method}</div>
@@ -57,7 +67,15 @@ export default async function AdminOrderPage({ params }) {
       {(subOrders ?? []).map((so) => (
         <section key={so.id} style={{ border: '1px solid #eee', borderRadius: 12, padding: 12, marginBottom: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <h3 style={{ margin: 0 }}>{so.stores?.name}</h3>
+            <h3 style={{ margin: 0 }}>
+              {so.stores?.name}
+              {so.parts_total > 1 ? (
+                <span style={{ fontSize: 13, color: '#777', fontWeight: 400 }}>
+                  {' '}
+                  · parcel {so.part_no} of {so.parts_total}
+                </span>
+              ) : null}
+            </h3>
             <StatusSelect id={so.id} current={so.status} />
           </div>
           {so.stores?.phone && <div style={{ fontSize: 12, color: '#777' }}>Store phone: {so.stores.phone}</div>}
@@ -65,6 +83,9 @@ export default async function AdminOrderPage({ params }) {
             <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, padding: '6px 0', borderTop: '1px solid #f3f3f3' }}>
               <div>
                 {it.products?.name} × {it.quantity}
+                {it.products?.product_no ? (
+                  <span style={{ color: '#777', fontSize: 12 }}> · product {it.products.product_no}</span>
+                ) : null}
                 <div style={{ fontSize: 12, color: '#777' }}>{[it.size, it.color].filter(Boolean).join(' / ')}</div>
               </div>
               <b>{money(it.price * it.quantity)}</b>
