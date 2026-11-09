@@ -53,7 +53,7 @@ export default async function OrderPage({ params }) {
 
   const { data: order } = await supabaseAdmin
     .from('orders')
-    .select('id, subtotal, delivery_fee, total')
+    .select('id, order_no, subtotal, delivery_fee, total, customers(member_no)')
     .eq('id', id)
     .maybeSingle();
 
@@ -82,7 +82,8 @@ export default async function OrderPage({ params }) {
   const subs = subOrders ?? [];
   const stage = stageOf(subs);
   const items = subs.flatMap((so) => (so.order_items ?? []).map((it) => ({ ...it, status: so.status })));
-  const shortId = String(order.id).slice(0, 8).toUpperCase();
+  const orderNo = order.order_no || String(order.id).slice(0, 8).toUpperCase();
+  const memberNo = order.customers ? order.customers.member_no : null;
 
   return (
     <main style={wrap}>
@@ -112,9 +113,23 @@ export default async function OrderPage({ params }) {
           {ar ? 'شكراً لك!' : 'Thank you!'}
         </h1>
         <p style={{ color: theme.muted, margin: '8px 0 0' }}>
-          {ar ? 'رقم طلبك ' : 'Your order number '}
-          <bdi style={{ color: theme.gold, fontWeight: 700 }}>#{shortId}</bdi>
-          {ar ? '. الدفع عند الاستلام.' : '. Payment on delivery.'}
+          {ar ? 'رقم طلبك' : 'Your order number'}
+        </p>
+        <div style={{ margin: '4px 0 0' }}>
+          <bdi dir="ltr" style={{ color: theme.gold, fontWeight: 700, fontSize: 20, letterSpacing: 1 }}>
+            {orderNo}
+          </bdi>
+        </div>
+        {memberNo ? (
+          <p style={{ color: theme.muted, margin: '8px 0 0', fontSize: 13 }}>
+            {ar ? 'رقم عضويتك: ' : 'Your membership number: '}
+            <bdi dir="ltr" style={{ color: theme.ink, fontWeight: 600 }}>
+              {memberNo}
+            </bdi>
+          </p>
+        ) : null}
+        <p style={{ color: theme.muted, margin: '8px 0 0', fontSize: 13 }}>
+          {ar ? 'الدفع عند الاستلام.' : 'Payment on delivery.'}
         </p>
       </div>
 
