@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { sendToAccounts, sendToAdmins } from '@/lib/push';
 import { clientKey, isLimited } from '@/lib/ratelimit';
-import { normPhone } from '@/lib/analytics';
+import { dayKey } from '@/lib/analytics';
+import { normalizePhone } from '@/lib/phone';
 
 const DELIVERY_FEE = 3;
 
@@ -39,17 +40,16 @@ async function notifyStores(groups) {
   } catch {}
 }
 
-async function notifyAdmins(orderId, groups, total) {
+async function notifyAdmins(orderId, orderNo, groups, total) {
   try {
     const storeIds = Object.keys(groups);
     const pieces = storeIds.reduce(
       (sum, sid) => sum + groups[sid].items.reduce((a, l) => a + l.qty, 0),
       0
     );
-    const shortId = String(orderId).slice(0, 8).toUpperCase();
     await sendToAdmins({
       title: 'طلب جديد على Sheout',
-      body: `#${shortId} · ${pieces} قطعة من ${storeIds.length} ${storeIds.length === 1 ? 'محل' : 'محلات'} · ${total.toFixed(2)} د.أ`,
+      body: `#${orderNo} · ${pieces} قطعة من ${storeIds.length} ${storeIds.length === 1 ? 'محل' : 'محلات'} · ${total.toFixed(2)} د.أ`,
       url: `/admin/orders/${orderId}`,
     });
   } catch {}
@@ -86,10 +86,10 @@ export async function POST(request) {
     });
   }
 
+  const phoneNorm = normalizePhone(phone);
   const limitMessage = 'Could not place your order: too many attempts. Please wait a few minutes.';
   if (await isLimited('order-ip:' + clientKey(request), 10, 600)) return bad(limitMessage, 429);
-  const phoneDigits = normPhone(phone);
-  if (phoneDigits && (await isLimited('order-phone:' + phoneDigits, 5, 3600))) {
+  if (phoneNorm && (await isLimited('order-phone:' + phoneNorm, 5, 3600))) {
     return bad(limitMessage, 429);
   }
 
@@ -128,35 +128,73 @@ export async function POST(request) {
   const total = r2(subtotal + DELIVERY_FEE);
 
   let customerId = null;
+  let createdCustomer = false;
   let orderId = null;
 
   async function rollback() {
     if (orderId) await supabaseAdmin.from('orders').delete().eq('id', orderId);
-    if (customerId) await supabaseAdmin.from('customers').delete().eq('id', customerId);
+    if (createdCustomer && customerId) await supabaseAdmin.from('customers').delete().eq('id', customerId);
   }
 
-  const { data: customer, error: customerError } = await supabaseAdmin
-    .from('customers')
-    .insert({ name, phone })
-    .select('id')
-    .single();
-  if (customerError || !customer) return bad('Could not place your order', 500);
+  let customer = null;
+  if (phoneNorm) {
+    const { data: existing } = await supabaseAdmin
+      .from('customers')
+      .select('id, member_no')
+      .eq('phone_norm', phoneNorm)
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    if (existing) customer = existing;
+  }
+
+  if (!customer) {
+    const { data: created, error: customerError } = await supabaseAdmin
+      .from('customers')
+      .insert({ name, phone, phone_norm: phoneNorm })
+      .select('id, member_no')
+      .single();
+    if (customerError || !created) return bad('Could not place your order', 500);
+    customer = created;
+    createdCustomer = true;
+  }
   customerId = customer.id;
 
-  const { data: order, error: orderError } = await supabaseAdmin
+  const prefix = `${dayKey(new Date()).replace(/-/g, '')}-${customer.member_no}-`;
+  const { count: todayCount } = await supabaseAdmin
     .from('orders')
-    .insert({
-      customer_id: customerId,
-      subtotal,
-      delivery_fee: DELIVERY_FEE,
-      total,
-      address,
-      notes: notes || null,
-      payment_method: 'cod',
-    })
-    .select('id')
-    .single();
-  if (orderError || !order) {
+    .select('id', { count: 'exact', head: true })
+    .eq('customer_id', customerId)
+    .like('order_no', `${prefix}%`);
+
+  let seq = (todayCount || 0) + 1;
+  let order = null;
+  for (let attempt = 0; attempt < 5 && !order; attempt++) {
+    const { data, error } = await supabaseAdmin
+      .from('orders')
+      .insert({
+        customer_id: customerId,
+        order_no: `${prefix}${seq}`,
+        subtotal,
+        delivery_fee: DELIVERY_FEE,
+        total,
+        address,
+        notes: notes || null,
+        payment_method: 'cod',
+      })
+      .select('id, order_no')
+      .single();
+
+    if (!error && data) {
+      order = data;
+    } else if (error && error.code === '23505') {
+      seq += 1;
+    } else {
+      break;
+    }
+  }
+
+  if (!order) {
     await rollback();
     return bad('Could not place your order', 500);
   }
@@ -166,10 +204,12 @@ export async function POST(request) {
   const { data: subOrders, error: subError } = await supabaseAdmin
     .from('sub_orders')
     .insert(
-      storeIds.map((sid) => ({
+      storeIds.map((sid, idx) => ({
         order_id: orderId,
         store_id: sid,
         subtotal: r2(groups[sid].subtotal),
+        part_no: idx + 1,
+        parts_total: storeIds.length,
       }))
     )
     .select('id, store_id');
@@ -206,7 +246,7 @@ export async function POST(request) {
       .eq('id', pid);
   }
 
-  await Promise.all([notifyStores(groups), notifyAdmins(orderId, groups, total)]);
+  await Promise.all([notifyStores(groups), notifyAdmins(orderId, order.order_no, groups, total)]);
 
-  return NextResponse.json({ orderId });
+  return NextResponse.json({ orderId, orderNo: order.order_no });
 }
