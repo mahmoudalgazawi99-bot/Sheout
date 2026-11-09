@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { getStoreSession } from '@/lib/storeauth';
 import { stampsFor } from '@/lib/statusstamps';
+import { refreshOrderStatus } from '@/lib/orderstatus';
+import { sendToAdmins } from '@/lib/push';
 
 const NEXT = { new: 'confirmed', confirmed: 'ready' };
 
@@ -20,7 +22,7 @@ export async function PATCH(request, { params }) {
 
   const { data: sub } = await supabaseAdmin
     .from('sub_orders')
-    .select('id, status, order_id, confirmed_at, ready_at, delivered_at')
+    .select('id, status, order_id, part_no, parts_total, confirmed_at, ready_at, delivered_at')
     .eq('id', id)
     .eq('store_id', account.store_id)
     .maybeSingle();
@@ -41,18 +43,25 @@ export async function PATCH(request, { params }) {
 
   if (error || !updated) return fail('تغيّرت حالة الطلب، حدّث الصفحة', 409);
 
-  const { data: siblings } = await supabaseAdmin
-    .from('sub_orders')
-    .select('status')
-    .eq('order_id', updated.order_id);
+  await refreshOrderStatus(updated.order_id);
 
-  const all = (siblings ?? []).map((s) => s.status);
-  let orderStatus = 'new';
-  if (all.length > 0 && all.every((s) => s === 'delivered')) orderStatus = 'delivered';
-  else if (all.length > 0 && all.every((s) => s === 'cancelled')) orderStatus = 'cancelled';
-  else if (all.some((s) => s !== 'new')) orderStatus = 'processing';
-
-  await supabaseAdmin.from('orders').update({ status: orderStatus }).eq('id', updated.order_id);
+  if (next === 'ready') {
+    try {
+      const storeName = (account.stores && (account.stores.name_ar || account.stores.name)) || '';
+      const { data: ord } = await supabaseAdmin
+        .from('orders')
+        .select('order_no')
+        .eq('id', updated.order_id)
+        .maybeSingle();
+      const orderNo = (ord && ord.order_no) || String(updated.order_id).slice(0, 8).toUpperCase();
+      const parts = sub.parts_total > 1 ? ` · طرد ${sub.part_no} من ${sub.parts_total}` : '';
+      await sendToAdmins({
+        title: 'طلب جاهز للاستلام',
+        body: `${storeName} · #${orderNo}${parts}`,
+        url: '/admin/courier',
+      });
+    } catch {}
+  }
 
   return NextResponse.json({ ok: true, status: next });
 }
