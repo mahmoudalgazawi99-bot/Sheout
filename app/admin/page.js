@@ -26,9 +26,23 @@ export default async function AdminPage() {
 
   const { data } = await supabaseAdmin
     .from('orders')
-    .select('id, total, status, created_at, customers(name, phone), sub_orders(id)')
+    .select('id, order_no, total, status, created_at, customers(name, phone, member_no), sub_orders(id)')
     .order('created_at', { ascending: false })
     .limit(50);
+
+  const { count: readyCount } = await supabaseAdmin
+    .from('sub_orders')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'ready');
+
+  let issueCount = 0;
+  try {
+    const { count } = await supabaseAdmin
+      .from('order_issues')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'open');
+    issueCount = count || 0;
+  } catch {}
 
   const orders = data ?? [];
 
@@ -40,7 +54,13 @@ export default async function AdminPage() {
       </div>
 
       <div style={{ margin: '12px 0', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <Link href="/admin/analytics" style={{ ...linkBtn, background: '#111', color: '#fff', border: '1px solid #111' }}>
+        <Link
+          href="/admin/courier"
+          style={{ ...linkBtn, background: '#111', color: '#fff', border: '1px solid #111' }}
+        >
+          Courier · {readyCount || 0} ready{issueCount > 0 ? ` · ${issueCount} issues` : ''}
+        </Link>
+        <Link href="/admin/analytics" style={linkBtn}>
           Analytics
         </Link>
         <Link href="/admin/stores" style={linkBtn}>
@@ -68,11 +88,12 @@ export default async function AdminPage() {
           style={{ display: 'block', border: '1px solid #eee', borderRadius: 12, padding: 12, marginBottom: 10, textDecoration: 'none', color: 'inherit' }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <b>#{String(o.id).slice(0, 8).toUpperCase()}</b>
+            <b>#{o.order_no || String(o.id).slice(0, 8).toUpperCase()}</b>
             <b>{money(o.total)}</b>
           </div>
           <div style={{ fontSize: 14, marginTop: 4 }}>
             {o.customers?.name} · {o.customers?.phone}
+            {o.customers?.member_no ? ` · member ${o.customers.member_no}` : ''}
           </div>
           <div style={{ fontSize: 12, color: '#777', marginTop: 4 }}>
             {when(o.created_at)} · {(o.sub_orders ?? []).length} store(s) · status: <b>{o.status}</b>
