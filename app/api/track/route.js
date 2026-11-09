@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { clientKey, isLimited } from '@/lib/ratelimit';
-import { normPhone } from '@/lib/analytics';
+import { normalizePhone } from '@/lib/phone';
 
 const notFound = () => NextResponse.json({ error: 'not_found' }, { status: 404 });
 
@@ -17,24 +17,29 @@ export async function POST(request) {
     return NextResponse.json({ error: 'bad_request' }, { status: 400 });
   }
 
-  const code = String(body.code || '').trim().replace(/^#/, '').toLowerCase();
-  const phone = normPhone(body.phone);
-  if (!/^[0-9a-f]{8}$/.test(code) || phone.length < 5) return notFound();
+  const code = String(body.code || '')
+    .trim()
+    .replace(/^#/, '')
+    .replace(/[٠-٩]/g, (c) => String(c.charCodeAt(0) - 1632))
+    .replace(/[۰-۹]/g, (c) => String(c.charCodeAt(0) - 1776))
+    .replace(/[–—−‐]/g, '-')
+    .replace(/\s+/g, '');
+  const phone = normalizePhone(body.phone);
 
-  const lo = `${code}-0000-0000-0000-000000000000`;
-  const hi = `${code}-ffff-ffff-ffff-ffffffffffff`;
+  if (!/^\d{8}-\d{1,10}-\d{1,4}$/.test(code) || phone.length < 5) return notFound();
 
   const { data } = await supabaseAdmin
     .from('orders')
-    .select('id, customers(phone)')
-    .gte('id', lo)
-    .lte('id', hi)
-    .limit(5);
+    .select('id, customers(phone, phone_norm)')
+    .eq('order_no', code)
+    .limit(1);
 
-  const match = (data ?? []).find(
-    (o) => normPhone(o.customers && o.customers.phone) === phone
-  );
-  if (!match) return notFound();
+  const o = (data ?? [])[0];
+  if (!o) return notFound();
 
-  return NextResponse.json({ orderId: match.id });
+  const c = o.customers || {};
+  const ok = c.phone_norm === phone || normalizePhone(c.phone) === phone;
+  if (!ok) return notFound();
+
+  return NextResponse.json({ orderId: o.id });
 }
