@@ -80,13 +80,14 @@ export default function TrackPage() {
       </div>
 
       <label style={{ fontSize: 14, fontWeight: 600 }}>
-        {ar ? 'رقم الطلب (الأحرف والأرقام بعد #)' : 'Order number (the characters after #)'}
+        {ar ? 'رقم الطلب (مثل 20261109-1042-1)' : 'Order number (like 20261109-1042-1)'}
         <input
           style={input}
           dir="ltr"
-          autoCapitalize="characters"
+          autoCapitalize="none"
           autoCorrect="off"
-          maxLength={9}
+          maxLength={30}
+          placeholder="20261109-1042-1"
           value={code}
           onChange={(e) => setCode(e.target.value)}
         />
