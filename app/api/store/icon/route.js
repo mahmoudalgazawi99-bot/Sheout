@@ -6,7 +6,20 @@ export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const wanted = Number(searchParams.get('size'));
   const size = [180, 192, 512].includes(wanted) ? wanted : 192;
-  const admin = searchParams.get('variant') === 'admin';
+  const variant = searchParams.get('variant');
+
+  let background = '#141414';
+  let color = '#b8924a';
+  let letter = 'S';
+  if (variant === 'admin') {
+    background = '#b8924a';
+    color = '#141414';
+    letter = 'A';
+  } else if (variant === 'courier') {
+    background = '#2f5d50';
+    color = '#faf6ef';
+    letter = 'C';
+  }
 
   return new ImageResponse(
     (
@@ -17,13 +30,13 @@ export async function GET(request) {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          background: admin ? '#b8924a' : '#141414',
-          color: admin ? '#141414' : '#b8924a',
+          background,
+          color,
           fontSize: Math.round(size * 0.6),
           fontWeight: 700,
         }}
       >
-        {admin ? 'A' : 'S'}
+        {letter}
       </div>
     ),
     { width: size, height: size }
