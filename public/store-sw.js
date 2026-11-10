@@ -14,14 +14,16 @@ self.addEventListener('push', (event) => {
     data = {};
   }
 
-  const isAdminTarget = String(data.url || '').startsWith('/admin');
-  const icon = isAdminTarget ? '/api/store/icon?size=192&variant=admin' : '/api/store/icon?size=192';
+  const url = String(data.url || '/store');
+  let icon = '/api/store/icon?size=192';
+  if (url.startsWith('/admin')) icon = '/api/store/icon?size=192&variant=admin';
+  else if (url.startsWith('/courier')) icon = '/api/store/icon?size=192&variant=courier';
 
   const options = {
     body: data.body || '',
     icon: icon,
     badge: icon,
-    data: { url: data.url || '/store' },
+    data: { url: url },
     dir: 'rtl',
     lang: 'ar',
   };
