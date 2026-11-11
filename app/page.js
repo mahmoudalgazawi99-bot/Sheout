@@ -1,164 +1,95 @@
 import Link from 'next/link';
-import { supabase } from '@/lib/supabaseClient';
-import CartLink from '@/components/CartLink';
-import LangToggle from '@/components/LangToggle';
-import { getLang } from '@/lib/serverlang';
-import { t, money, pick } from '@/lib/i18n';
-import { theme } from '@/lib/theme';
+import { redirect } from 'next/navigation';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { isAdmin } from '@/lib/adminauth';
+import AdminLogout from '@/components/adminlogout';
+import PushSetup from '@/components/pushsetup';
 
 export const dynamic = 'force-dynamic';
 
-const CATEGORIES = ['Women', 'Men', 'Kids', 'Shoes', 'Sports', 'Accessories'];
+const money = (v) => `${Number(v).toFixed(2)} JD`;
+const when = (v) => String(v).replace('T', ' ').slice(0, 16);
 
-function firstImage(images) {
-  if (!Array.isArray(images) || images.length === 0) return null;
-  const first = images[0];
-  if (typeof first === 'string') return first;
-  if (first && typeof first === 'object' && first.url) return String(first.url);
-  return null;
-}
+const linkBtn = {
+  display: 'inline-block',
+  border: '1px solid #ddd',
+  borderRadius: 8,
+  padding: '8px 12px',
+  fontSize: 13,
+  color: '#111',
+  textDecoration: 'none',
+  background: '#fff',
+};
 
-function SectionTitle({ children }) {
+export default async function AdminPage() {
+  if (!(await isAdmin())) redirect('/admin/login');
+
+  const { data } = await supabaseAdmin
+    .from('orders')
+    .select('id, order_no, total, status, created_at, customers(name, phone, member_no), sub_orders(id)')
+    .order('created_at', { ascending: false })
+    .limit(50);
+
+  const { count: readyCount } = await supabaseAdmin
+    .from('sub_orders')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'ready');
+
+  const orders = data ?? [];
+
   return (
-    <div style={{ margin: '28px 0 14px' }}>
-      <h2 style={{ fontFamily: theme.serif, fontSize: 24, fontWeight: 600, margin: 0 }}>{children}</h2>
-      <div style={{ width: 36, height: 3, background: theme.gold, borderRadius: 2, marginTop: 6 }} />
-    </div>
-  );
-}
+    <main style={{ maxWidth: 720, margin: '0 auto', padding: 16, fontFamily: 'sans-serif' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <h1 style={{ margin: 0 }}>Orders</h1>
+        <AdminLogout />
+      </div>
 
-function ProductGrid({ products, lang }) {
-  const card = {
-    background: theme.card,
-    borderRadius: theme.radius,
-    overflow: 'hidden',
-    boxShadow: theme.shadow,
-    border: `1px solid ${theme.line}`,
-    textDecoration: 'none',
-    color: 'inherit',
-    display: 'block',
-  };
-  return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
-      {products.map((p) => (
-        <Link key={p.id} href={`/products/${p.id}`} style={card}>
-          <img
-            src={firstImage(p.images) || ''}
-            alt={pick(lang, p.name, p.name_ar)}
-            style={{ width: '100%', aspectRatio: '4 / 5', objectFit: 'cover', background: theme.goldSoft, display: 'block' }}
-          />
-          <div style={{ padding: '12px 14px' }}>
-            <b style={{ fontSize: 14, display: 'block' }}>{pick(lang, p.name, p.name_ar)}</b>
-            <div style={{ marginTop: 6 }}>
-              {p.sale_price ? (
-                <>
-                  <b style={{ color: theme.gold }}>{money(lang, p.sale_price)}</b>{' '}
-                  <s style={{ color: theme.muted, fontSize: 12 }}>{money(lang, p.price)}</s>
-                </>
-              ) : (
-                <b>{money(lang, p.price)}</b>
-              )}
-            </div>
+      <div style={{ margin: '12px 0', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <Link href="/admin/analytics" style={{ ...linkBtn, background: '#111', color: '#fff', border: '1px solid #111' }}>
+          Analytics
+        </Link>
+        <Link href="/admin/couriers" style={linkBtn}>
+          Couriers
+        </Link>
+        <Link href="/admin/stores" style={linkBtn}>
+          Store accounts
+        </Link>
+      </div>
+
+      <div dir="rtl">
+        <PushSetup
+          publicKey={process.env.VAPID_PUBLIC_KEY || ''}
+          apiBase="/api/admin/push"
+          swUrl="/store-sw.js"
+          scope="/admin"
+        />
+      </div>
+
+      <p style={{ color: '#777', fontSize: 13 }}>
+        {orders.length} latest orders · {readyCount || 0} store parcels ready for pickup
+      </p>
+
+      {orders.length === 0 && <p style={{ color: '#777' }}>No orders yet.</p>}
+
+      {orders.map((o) => (
+        <Link
+          key={o.id}
+          href={`/admin/orders/${o.id}`}
+          style={{ display: 'block', border: '1px solid #eee', borderRadius: 12, padding: 12, marginBottom: 10, textDecoration: 'none', color: 'inherit' }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <b>#{o.order_no || String(o.id).slice(0, 8).toUpperCase()}</b>
+            <b>{money(o.total)}</b>
+          </div>
+          <div style={{ fontSize: 14, marginTop: 4 }}>
+            {o.customers?.name} · {o.customers?.phone}
+            {o.customers?.member_no ? ` · member ${o.customers.member_no}` : ''}
+          </div>
+          <div style={{ fontSize: 12, color: '#777', marginTop: 4 }}>
+            {when(o.created_at)} · {(o.sub_orders ?? []).length} store(s) · status: <b>{o.status}</b>
           </div>
         </Link>
       ))}
-    </div>
-  );
-}
-
-export default async function Home() {
-  const lang = await getLang();
-
-  const [newRes, offersRes] = await Promise.all([
-    supabase
-      .from('products')
-      .select('id, name, name_ar, price, sale_price, images')
-      .eq('status', 'active')
-      .order('created_at', { ascending: false })
-      .limit(8),
-    supabase
-      .from('products')
-      .select('id, name, name_ar, price, sale_price, images')
-      .eq('status', 'active')
-      .not('sale_price', 'is', null)
-      .order('created_at', { ascending: false })
-      .limit(6),
-  ]);
-
-  const newProducts = newRes.data ?? [];
-  const offers = offersRes.data ?? [];
-  const hasError = newRes.error || offersRes.error;
-
-  return (
-    <main style={{ maxWidth: 720, margin: '0 auto', padding: 16 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '8px 0 4px' }}>
-        <div>
-          <h1 style={{ fontFamily: theme.serif, letterSpacing: 6, fontSize: 30, margin: 0, fontWeight: 600 }}>SHEOUT</h1>
-          <div style={{ fontSize: 12, color: theme.muted, marginTop: 2 }}>
-            {lang === 'ar' ? 'أزياء عصرية من الأردن' : 'Modern fashion from Jordan'}
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <LangToggle />
-          <CartLink />
-        </div>
-      </div>
-
-      <form action="/search" method="GET" style={{ marginTop: 16 }}>
-        <input
-          name="q"
-          placeholder={lang === 'ar' ? 'ابحث عن منتج...' : 'Search products...'}
-          style={{
-            width: '100%',
-            padding: '14px 18px',
-            borderRadius: 999,
-            border: `1px solid ${theme.line}`,
-            background: theme.card,
-            boxShadow: theme.shadow,
-            fontSize: 16,
-            outline: 'none',
-          }}
-        />
-      </form>
-
-      <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '14px 0 4px' }}>
-        {CATEGORIES.map((c) => (
-          <Link
-            key={c}
-            href={`/search?category=${c}`}
-            style={{
-              background: theme.ink,
-              color: theme.bg,
-              padding: '9px 18px',
-              borderRadius: 999,
-              fontSize: 13,
-              fontWeight: 500,
-              whiteSpace: 'nowrap',
-              textDecoration: 'none',
-            }}
-          >
-            {t(lang, c)}
-          </Link>
-        ))}
-      </div>
-
-      {hasError && <p style={{ color: '#b00' }}>{t(lang, 'loadError')}</p>}
-
-      <SectionTitle>{t(lang, 'newArrivals')}</SectionTitle>
-      <ProductGrid products={newProducts} lang={lang} />
-
-      {offers.length > 0 && (
-        <>
-          <SectionTitle>{lang === 'ar' ? 'عروض خاصة' : 'Special Offers'}</SectionTitle>
-          <ProductGrid products={offers} lang={lang} />
-        </>
-      )}
-
-      <div style={{ textAlign: 'center', margin: '36px 0 12px' }}>
-        <Link href="/track" style={{ color: theme.gold, fontWeight: 600, fontSize: 14 }}>
-          {lang === 'ar' ? 'تتبّع طلبك' : 'Track your order'}
-        </Link>
-      </div>
     </main>
   );
 }
