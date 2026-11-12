@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-const STATUSES = ['new', 'confirmed', 'ready', 'delivered', 'cancelled'];
+const STATUSES = ['new', 'confirmed', 'ready', 'picked_up', 'delivered', 'cancelled'];
 
 export default function StatusSelect({ id, current }) {
   const router = useRouter();
