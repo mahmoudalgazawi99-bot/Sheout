@@ -3,7 +3,7 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { getStoreSession } from '@/lib/storeauth';
 import { stampsFor } from '@/lib/statusstamps';
 import { refreshOrderStatus } from '@/lib/orderstatus';
-import { sendToAdmins } from '@/lib/push';
+import { sendToAdmins, sendToCouriers } from '@/lib/push';
 
 const NEXT = { new: 'confirmed', confirmed: 'ready' };
 
@@ -22,7 +22,7 @@ export async function PATCH(request, { params }) {
 
   const { data: sub } = await supabaseAdmin
     .from('sub_orders')
-    .select('id, status, order_id, part_no, parts_total, confirmed_at, ready_at, delivered_at')
+    .select('id, status, order_id, part_no, parts_total, confirmed_at, ready_at, picked_up_at, delivered_at')
     .eq('id', id)
     .eq('store_id', account.store_id)
     .maybeSingle();
@@ -48,18 +48,35 @@ export async function PATCH(request, { params }) {
   if (next === 'ready') {
     try {
       const storeName = (account.stores && (account.stores.name_ar || account.stores.name)) || '';
+
       const { data: ord } = await supabaseAdmin
         .from('orders')
-        .select('order_no')
+        .select('order_no, courier_id')
         .eq('id', updated.order_id)
         .maybeSingle();
+      const { data: st } = await supabaseAdmin
+        .from('stores')
+        .select('location, location_ar')
+        .eq('id', account.store_id)
+        .maybeSingle();
+      const { data: items } = await supabaseAdmin
+        .from('order_items')
+        .select('quantity')
+        .eq('sub_order_id', id);
+
+      const pieces = (items ?? []).reduce((sum, i) => sum + (Number(i.quantity) || 0), 0);
       const orderNo = (ord && ord.order_no) || String(updated.order_id).slice(0, 8).toUpperCase();
+      const where = st ? st.location_ar || st.location || '' : '';
       const parts = sub.parts_total > 1 ? ` · طرد ${sub.part_no} من ${sub.parts_total}` : '';
-      await sendToAdmins({
-        title: 'طلب جاهز للاستلام',
-        body: `${storeName} · #${orderNo}${parts}`,
-        url: '/admin/courier',
-      });
+      const text = `${storeName}${where ? ' · ' + where : ''} · #${orderNo}${parts} · ${pieces} قطعة`;
+
+      await Promise.all([
+        sendToAdmins({ title: 'طلب جاهز للاستلام', body: text, url: '/admin' }),
+        sendToCouriers(
+          { title: 'طلب جاهز للاستلام', body: text, url: '/courier' },
+          ord && ord.courier_id ? ord.courier_id : null
+        ),
+      ]);
     } catch {}
   }
 
