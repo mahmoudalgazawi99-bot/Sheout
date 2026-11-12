@@ -11,20 +11,22 @@ export const dynamic = 'force-dynamic';
 // Put the support phone number here to show it on the page (example: '0790000000')
 const SUPPORT_PHONE = '';
 
-const STAGES = ['new', 'confirmed', 'ready', 'delivered'];
+const STAGES = ['new', 'confirmed', 'ready', 'picked_up', 'delivered'];
 
 const LABELS = {
   ar: {
     new: 'تم استلام الطلب',
     confirmed: 'قيد التجهيز',
-    ready: 'جاهز للتوصيل',
+    ready: 'جاهز',
+    picked_up: 'بالطريق إليك',
     delivered: 'تم التوصيل',
     cancelled: 'ملغي',
   },
   en: {
     new: 'Order received',
     confirmed: 'Preparing',
-    ready: 'Ready for delivery',
+    ready: 'Ready',
+    picked_up: 'On the way',
     delivered: 'Delivered',
     cancelled: 'Cancelled',
   },
@@ -112,9 +114,7 @@ export default async function OrderPage({ params }) {
         <h1 style={{ fontFamily: theme.serif, fontSize: 30, fontWeight: 600, margin: 0 }}>
           {ar ? 'شكراً لك!' : 'Thank you!'}
         </h1>
-        <p style={{ color: theme.muted, margin: '8px 0 0' }}>
-          {ar ? 'رقم طلبك' : 'Your order number'}
-        </p>
+        <p style={{ color: theme.muted, margin: '8px 0 0' }}>{ar ? 'رقم طلبك' : 'Your order number'}</p>
         <div style={{ margin: '4px 0 0' }}>
           <bdi dir="ltr" style={{ color: theme.gold, fontWeight: 700, fontSize: 20, letterSpacing: 1 }}>
             {orderNo}
@@ -148,7 +148,7 @@ export default async function OrderPage({ params }) {
             {ar ? 'تم إلغاء الطلب' : 'This order was cancelled'}
           </div>
         ) : (
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 4 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 2 }}>
             {STAGES.map((s, i) => {
               const done = i <= stage;
               return (
@@ -171,7 +171,7 @@ export default async function OrderPage({ params }) {
                   </div>
                   <div
                     style={{
-                      fontSize: 12,
+                      fontSize: 11,
                       color: done ? theme.ink : theme.muted,
                       fontWeight: i === stage ? 700 : 400,
                     }}
