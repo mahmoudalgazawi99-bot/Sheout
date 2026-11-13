@@ -1,3 +1,5 @@
+import AutoRefresh from '@/components/autorefresh';
+
 export const metadata = {
   title: 'Sheout Stores',
   manifest: '/api/store/manifest',
@@ -19,6 +21,7 @@ export const viewport = {
 export default function StoreLayout({ children }) {
   return (
     <div dir="rtl" lang="ar">
+      <AutoRefresh global seconds={30} />
       {children}
     </div>
   );
