@@ -1,3 +1,5 @@
+import AutoRefresh from '@/components/autorefresh';
+
 export const metadata = {
   title: 'Sheout Courier',
   manifest: '/api/courier/manifest',
@@ -19,6 +21,7 @@ export const viewport = {
 export default function CourierLayout({ children }) {
   return (
     <div dir="rtl" lang="ar">
+      <AutoRefresh global seconds={20} />
       {children}
     </div>
   );
