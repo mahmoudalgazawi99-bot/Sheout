@@ -54,14 +54,20 @@ export default async function AdminPage() {
       </div>
 
       <div style={{ margin: '12px 0', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <Link
-          href="/admin/courier"
-          style={{ ...linkBtn, background: '#111', color: '#fff', border: '1px solid #111' }}
-        >
-          Courier · {readyCount || 0} ready{issueCount > 0 ? ` · ${issueCount} issues` : ''}
-        </Link>
-        <Link href="/admin/analytics" style={linkBtn}>
+        <Link href="/admin/analytics" style={{ ...linkBtn, background: '#111', color: '#fff', border: '1px solid #111' }}>
           Analytics
+        </Link>
+        <Link
+          href="/admin/issues"
+          style={{
+            ...linkBtn,
+            ...(issueCount > 0 ? { borderColor: '#b00', color: '#b00', fontWeight: 700 } : {}),
+          }}
+        >
+          Issues{issueCount > 0 ? ` · ${issueCount}` : ''}
+        </Link>
+        <Link href="/admin/couriers" style={linkBtn}>
+          Couriers
         </Link>
         <Link href="/admin/stores" style={linkBtn}>
           Store accounts
@@ -77,7 +83,9 @@ export default async function AdminPage() {
         />
       </div>
 
-      <p style={{ color: '#777', fontSize: 13 }}>{orders.length} latest orders</p>
+      <p style={{ color: '#777', fontSize: 13 }}>
+        {orders.length} latest orders · {readyCount || 0} store parcels ready for pickup
+      </p>
 
       {orders.length === 0 && <p style={{ color: '#777' }}>No orders yet.</p>}
 
