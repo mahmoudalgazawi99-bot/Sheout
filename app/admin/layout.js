@@ -1,3 +1,5 @@
+import AutoRefresh from '@/components/autorefresh';
+
 export const metadata = {
   title: 'Sheout Admin',
   manifest: '/api/admin/manifest',
@@ -19,6 +21,7 @@ export const viewport = {
 export default function AdminLayout({ children }) {
   return (
     <div dir="ltr" lang="en">
+      <AutoRefresh global seconds={30} />
       {children}
     </div>
   );
