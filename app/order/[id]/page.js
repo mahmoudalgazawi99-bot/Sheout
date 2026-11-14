@@ -2,8 +2,10 @@ import Link from 'next/link';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import LangToggle from '@/components/LangToggle';
 import AutoRefresh from '@/components/autorefresh';
+import { ReviewForm, ComplaintForm } from '@/components/orderfeedback';
 import { getLang } from '@/lib/serverlang';
 import { money, pick, sizeLabel, colorLabel } from '@/lib/i18n';
+import { typeLabel, complaintStatusLabel } from '@/lib/feedback';
 import { theme } from '@/lib/theme';
 
 export const dynamic = 'force-dynamic';
@@ -47,6 +49,15 @@ function stageOf(subs) {
   return Math.min(...active.map((s) => Math.max(0, STAGES.indexOf(s.status))));
 }
 
+const sectionBox = {
+  background: theme.card,
+  border: `1px solid ${theme.line}`,
+  borderRadius: theme.radius,
+  boxShadow: theme.shadow,
+  padding: 16,
+  marginBottom: 16,
+};
+
 export default async function OrderPage({ params }) {
   const lang = await getLang();
   const ar = lang === 'ar';
@@ -78,14 +89,47 @@ export default async function OrderPage({ params }) {
 
   const { data: subOrders } = await supabaseAdmin
     .from('sub_orders')
-    .select('id, status, order_items(quantity, price, size, color, products(name, name_ar, images))')
+    .select('id, status, order_items(product_id, quantity, price, size, color, products(name, name_ar, images))')
     .eq('order_id', id);
+
+  let complaints = [];
+  let reviews = [];
+  try {
+    const { data: cp } = await supabaseAdmin
+      .from('complaints')
+      .select('id, type, message, status, admin_reply, created_at')
+      .eq('order_id', id)
+      .order('created_at', { ascending: false });
+    complaints = cp ?? [];
+    const { data: rv } = await supabaseAdmin
+      .from('product_reviews')
+      .select('product_id, rating, comment')
+      .eq('order_id', id);
+    reviews = rv ?? [];
+  } catch {}
 
   const subs = subOrders ?? [];
   const stage = stageOf(subs);
   const items = subs.flatMap((so) => (so.order_items ?? []).map((it) => ({ ...it, status: so.status })));
   const orderNo = order.order_no || String(order.id).slice(0, 8).toUpperCase();
   const memberNo = order.customers ? order.customers.member_no : null;
+
+  const deliveredItems = items.filter((it) => it.status === 'delivered');
+  const seen = new Set();
+  const deliveredProducts = [];
+  deliveredItems.forEach((it) => {
+    if (it.product_id && !seen.has(it.product_id)) {
+      seen.add(it.product_id);
+      deliveredProducts.push({
+        id: it.product_id,
+        name: it.products ? pick(lang, it.products.name, it.products.name_ar) : '',
+      });
+    }
+  });
+  const reviewByProduct = {};
+  reviews.forEach((r) => {
+    reviewByProduct[r.product_id] = r;
+  });
 
   return (
     <main style={wrap}>
@@ -133,16 +177,7 @@ export default async function OrderPage({ params }) {
         </p>
       </div>
 
-      <section
-        style={{
-          background: theme.card,
-          border: `1px solid ${theme.line}`,
-          borderRadius: theme.radius,
-          boxShadow: theme.shadow,
-          padding: 16,
-          marginBottom: 16,
-        }}
-      >
+      <section style={sectionBox}>
         {stage === -1 ? (
           <div style={{ textAlign: 'center', color: '#b00', fontWeight: 700 }}>
             {ar ? 'تم إلغاء الطلب' : 'This order was cancelled'}
@@ -188,16 +223,7 @@ export default async function OrderPage({ params }) {
         </div>
       </section>
 
-      <section
-        style={{
-          background: theme.card,
-          border: `1px solid ${theme.line}`,
-          borderRadius: theme.radius,
-          boxShadow: theme.shadow,
-          padding: '4px 14px',
-          marginBottom: 14,
-        }}
-      >
+      <section style={{ ...sectionBox, padding: '4px 14px', marginBottom: 14 }}>
         {items.map((it, idx) => {
           const p = it.products;
           const name = p ? pick(lang, p.name, p.name_ar) : '';
@@ -255,6 +281,58 @@ export default async function OrderPage({ params }) {
           <b>{money(lang, order.total)}</b>
         </div>
       </div>
+
+      {deliveredProducts.length > 0 && (
+        <div style={{ marginTop: 28 }}>
+          <div style={{ margin: '0 0 12px' }}>
+            <h2 style={{ fontFamily: theme.serif, fontSize: 22, fontWeight: 600, margin: 0 }}>
+              {ar ? 'قيّم منتجاتك' : 'Rate your items'}
+            </h2>
+            <div style={{ width: 36, height: 3, background: theme.gold, borderRadius: 2, marginTop: 6 }} />
+          </div>
+          {deliveredProducts.map((p) => (
+            <div key={p.id} style={{ ...sectionBox, padding: 14, marginBottom: 12 }}>
+              <b style={{ fontSize: 14 }}>{p.name}</b>
+              <ReviewForm orderId={order.id} productId={p.id} existing={reviewByProduct[p.id]} lang={lang} />
+            </div>
+          ))}
+
+          <div style={{ margin: '24px 0 12px' }}>
+            <h2 style={{ fontFamily: theme.serif, fontSize: 22, fontWeight: 600, margin: 0 }}>
+              {ar ? 'عندك ملاحظة أو شكوى؟' : 'Have a problem?'}
+            </h2>
+            <div style={{ width: 36, height: 3, background: theme.gold, borderRadius: 2, marginTop: 6 }} />
+          </div>
+
+          {complaints.map((c) => (
+            <div key={c.id} style={{ ...sectionBox, padding: 14, marginBottom: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                <b style={{ fontSize: 14 }}>{typeLabel(c.type, ar ? 'ar' : 'en')}</b>
+                <span
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: c.status === 'resolved' ? '#177a3c' : theme.gold,
+                  }}
+                >
+                  {complaintStatusLabel(c.status, ar ? 'ar' : 'en')}
+                </span>
+              </div>
+              <div style={{ fontSize: 14, lineHeight: 1.7, marginTop: 6 }}>{c.message}</div>
+              {c.admin_reply ? (
+                <div style={{ marginTop: 8, padding: '8px 12px', background: theme.goldSoft, borderRadius: 10, fontSize: 14 }}>
+                  <b>{ar ? 'ردّنا: ' : 'Our reply: '}</b>
+                  {c.admin_reply}
+                </div>
+              ) : null}
+            </div>
+          ))}
+
+          <div style={{ ...sectionBox, padding: 14 }}>
+            <ComplaintForm orderId={order.id} products={deliveredProducts} lang={lang} />
+          </div>
+        </div>
+      )}
 
       <p style={{ fontSize: 13, color: theme.muted, lineHeight: 1.8, marginTop: 18 }}>
         {ar
