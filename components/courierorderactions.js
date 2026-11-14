@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { theme } from '@/lib/theme';
 
-function Action({ url, body, label, busyLabel, confirmText, dark }) {
+function Action({ url, body, label, busyLabel, confirmText, dark, after }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -25,7 +25,8 @@ function Action({ url, body, label, busyLabel, confirmText, dark }) {
         setBusy(false);
         return;
       }
-      router.refresh();
+      if (after) router.push(after);
+      else router.refresh();
     } catch {
       setError('مشكلة في الاتصال، حاول مرة أخرى');
     }
@@ -78,6 +79,7 @@ export function DeliverButton({ orderId, amount }) {
       label="تم التوصيل"
       busyLabel="جارٍ التأكيد..."
       confirmText={`تأكيد التوصيل واستلام المبلغ ${amount}؟`}
+      after={`/courier/history?note=${orderId}`}
     />
   );
 }
