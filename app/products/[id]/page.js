@@ -1,10 +1,13 @@
 import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import AddToCart from '@/components/AddToCart';
 import CartLink from '@/components/CartLink';
 import LangToggle from '@/components/LangToggle';
 import { getLang } from '@/lib/serverlang';
 import { t, money, pick } from '@/lib/i18n';
+import { toDate } from '@/lib/analytics';
+import { stars } from '@/lib/feedback';
 import { theme } from '@/lib/theme';
 
 export const dynamic = 'force-dynamic';
@@ -23,6 +26,7 @@ function toList(v) {
 
 export default async function ProductPage({ params }) {
   const lang = await getLang();
+  const ar = lang === 'ar';
   const { id } = await params;
 
   const { data: product } = await supabase
@@ -35,7 +39,7 @@ export default async function ProductPage({ params }) {
   const topBar = (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
       <Link href="/" style={{ color: theme.ink, textDecoration: 'none', fontSize: 14 }}>
-        {lang === 'ar' ? '→ ' : '← '}
+        {ar ? '→ ' : '← '}
         {t(lang, 'backTo')}
       </Link>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -53,6 +57,20 @@ export default async function ProductPage({ params }) {
       </main>
     );
   }
+
+  let reviews = [];
+  try {
+    const { data: rv } = await supabaseAdmin
+      .from('product_reviews')
+      .select('rating, comment, display_name, created_at')
+      .eq('product_id', id)
+      .eq('status', 'visible')
+      .order('created_at', { ascending: false })
+      .limit(100);
+    reviews = rv ?? [];
+  } catch {}
+  const reviewCount = reviews.length;
+  const avg = reviewCount ? Math.round((reviews.reduce((s, r) => s + r.rating, 0) / reviewCount) * 10) / 10 : 0;
 
   const images = toImageList(product.images);
   const sizes = toList(product.sizes);
@@ -88,7 +106,16 @@ export default async function ProductPage({ params }) {
         </div>
       )}
 
-      <h1 style={{ fontFamily: theme.serif, fontSize: 28, fontWeight: 600, margin: '18px 0 8px' }}>{productName}</h1>
+      <h1 style={{ fontFamily: theme.serif, fontSize: 28, fontWeight: 600, margin: '18px 0 4px' }}>{productName}</h1>
+
+      {reviewCount > 0 && (
+        <div style={{ fontSize: 14, marginBottom: 6 }}>
+          <span style={{ color: theme.gold }}>★</span> <b>{avg}</b>{' '}
+          <span style={{ color: theme.muted }}>
+            ({reviewCount} {ar ? 'تقييم' : reviewCount === 1 ? 'review' : 'reviews'})
+          </span>
+        </div>
+      )}
 
       <div style={{ fontSize: 22 }}>
         {product.sale_price ? (
@@ -121,6 +148,47 @@ export default async function ProductPage({ params }) {
         sizes={sizes}
         colors={colors}
       />
+
+      <div style={{ margin: '30px 0 12px' }}>
+        <h2 style={{ fontFamily: theme.serif, fontSize: 22, fontWeight: 600, margin: 0 }}>
+          {ar ? 'تقييمات العملاء' : 'Customer reviews'}
+        </h2>
+        <div style={{ width: 36, height: 3, background: theme.gold, borderRadius: 2, marginTop: 6 }} />
+      </div>
+
+      {reviewCount === 0 && (
+        <p style={{ color: theme.muted, fontSize: 14 }}>
+          {ar ? 'ما في تقييمات لسا. التقييم متاح للي استلم المنتج.' : 'No reviews yet. Reviews are open to customers who received this product.'}
+        </p>
+      )}
+
+      {reviews.slice(0, 10).map((r, i) => {
+        const d = toDate(r.created_at);
+        return (
+          <div
+            key={i}
+            style={{
+              background: theme.card,
+              border: `1px solid ${theme.line}`,
+              borderRadius: theme.radius,
+              padding: 12,
+              marginBottom: 10,
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+              <b style={{ fontSize: 14 }}>{r.display_name}</b>
+              <span style={{ fontSize: 12, color: theme.muted }}>
+                {d ? d.toLocaleDateString(ar ? 'ar-JO' : 'en-GB', { timeZone: 'Asia/Amman', dateStyle: 'medium' }) : ''}
+              </span>
+            </div>
+            <div style={{ color: theme.gold, fontSize: 18, marginTop: 2 }}>{stars(r.rating)}</div>
+            {r.comment ? <div style={{ fontSize: 14, lineHeight: 1.7, marginTop: 4 }}>{r.comment}</div> : null}
+            <div style={{ fontSize: 11, color: '#177a3c', marginTop: 4 }}>
+              {ar ? '✓ مشتري موثّق' : '✓ Verified purchase'}
+            </div>
+          </div>
+        );
+      })}
     </main>
   );
 }
