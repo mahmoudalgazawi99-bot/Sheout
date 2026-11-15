@@ -19,6 +19,10 @@ export async function GET(request) {
     background = '#2f5d50';
     color = '#faf6ef';
     letter = 'C';
+  } else if (variant === 'warehouse') {
+    background = '#4a3f6b';
+    color = '#faf6ef';
+    letter = 'W';
   }
 
   return new ImageResponse(
