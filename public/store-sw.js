@@ -16,8 +16,9 @@ self.addEventListener('push', (event) => {
 
   const url = String(data.url || '/store');
   let icon = '/api/store/icon?size=192';
-  if (url.startsWith('/admin')) icon = '/api/store/icon?size=192&variant=admin';
-  else if (url.startsWith('/courier')) icon = '/api/store/icon?size=192&variant=courier';
+  if (url.startsWith('/admin')) icon += '&variant=admin';
+  else if (url.startsWith('/courier')) icon += '&variant=courier';
+  else if (url.startsWith('/warehouse')) icon += '&variant=warehouse';
 
   const options = {
     body: data.body || '',
