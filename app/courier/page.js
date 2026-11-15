@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
-import { getCourierSession, canPickup, canWarehouse, roleLabel } from '@/lib/courierauth';
-import { loadPickup, loadDelivery, loadWarehouse, loadCourierHistory } from '@/lib/courierdata';
+import { getCourierSession, canPickup, roleLabel } from '@/lib/courierauth';
+import { loadPickup, loadDelivery, loadCourierHistory } from '@/lib/courierdata';
 import CourierLogout from '@/components/courierlogout';
 import PushSetup from '@/components/pushsetup';
 import { MenuGrid, MenuCard, StatStrip, Banner } from '@/components/appmenu';
@@ -12,50 +12,25 @@ export const dynamic = 'force-dynamic';
 export default async function CourierHome() {
   const account = await getCourierSession();
   if (!account) redirect('/courier/login');
+  if (!canPickup(account.role)) redirect('/warehouse');
 
-  const doPickup = canPickup(account.role);
-  const doWh = canWarehouse(account.role);
+  const pickup = await loadPickup(account.id);
+  const delivery = await loadDelivery(account.id);
+  const history = await loadCourierHistory(account.id);
 
-  const pickup = doPickup ? await loadPickup(account.id) : null;
-  const delivery = doPickup ? await loadDelivery(account.id) : null;
-  const wh = doWh ? await loadWarehouse() : null;
-  const history = doPickup ? await loadCourierHistory(account.id) : null;
-
-  const readyCount = pickup ? pickup.readyCount : 0;
-  const carryingCount = pickup ? pickup.carrying.length : 0;
-  const availableCount = delivery ? delivery.available.length : 0;
-  const mineCount = delivery ? delivery.mine.length : 0;
-  const incomingParcels = wh ? wh.incoming.reduce((n, e) => n + e.arriving.length, 0) : 0;
-  const toPackCount = wh ? wh.toPack.length : 0;
-  const packedCount = wh ? wh.packed.length : 0;
+  const readyCount = pickup.readyCount;
+  const carryingCount = pickup.carrying.length;
+  const availableCount = delivery.available.length;
+  const mineCount = delivery.mine.length;
 
   let banner = { href: '/courier', text: 'ما في طلبات حالياً', dark: false };
   if (mineCount > 0) banner = { href: '/courier/deliver', text: `عندك ${mineCount} طلب للتوصيل`, dark: true };
-  else if (carryingCount > 0) banner = { href: '/courier/pickup', text: `معك ${carryingCount} طرد للمستودع`, dark: true };
-  else if (toPackCount > 0) banner = { href: '/courier/pack', text: `${toPackCount} طلب جاهز للتجهيز`, dark: true };
-  else if (availableCount > 0) banner = { href: '/courier/deliver', text: `${availableCount} طلب جاهز بالمستودع للتوصيل`, dark: true };
-  else if (incomingParcels > 0) banner = { href: '/courier/receive', text: `${incomingParcels} طرد بالطريق للمستودع`, dark: false };
-  else if (readyCount > 0) banner = { href: '/courier/pickup', text: `${readyCount} طرد جاهز للاستلام من المحلات`, dark: false };
-
-  let strip;
-  if (doPickup && doWh) {
-    strip = [
-      { label: 'للاستلام', value: readyCount },
-      { label: 'للتجهيز', value: toPackCount },
-      { label: 'للتوصيل', value: mineCount + availableCount },
-    ];
-  } else if (doWh) {
-    strip = [
-      { label: 'بالطريق للمستودع', value: incomingParcels },
-      { label: 'للتجهيز', value: toPackCount },
-      { label: 'مجهّزة', value: packedCount },
-    ];
-  } else {
-    strip = [
-      { label: 'للاستلام', value: readyCount },
-      { label: 'معك للمستودع', value: carryingCount },
-      { label: 'للتوصيل', value: mineCount + availableCount },
-    ];
+  else if (carryingCount > 0) {
+    banner = { href: '/courier/pickup', text: `معك ${carryingCount} طرد للمستودع`, dark: true };
+  } else if (availableCount > 0) {
+    banner = { href: '/courier/deliver', text: `${availableCount} طلب جاهز بالمستودع للتوصيل`, dark: true };
+  } else if (readyCount > 0) {
+    banner = { href: '/courier/pickup', text: `${readyCount} طرد جاهز للاستلام من المحلات`, dark: false };
   }
 
   return (
@@ -72,42 +47,30 @@ export default async function CourierHome() {
         {banner.text}
       </Banner>
 
-      <StatStrip items={strip} />
+      <StatStrip
+        items={[
+          { label: 'للاستلام', value: readyCount },
+          { label: 'معك للمستودع', value: carryingCount },
+          { label: 'للتوصيل', value: mineCount + availableCount, dark: mineCount > 0 },
+        ]}
+      />
 
       <MenuGrid>
-        {doPickup && (
-          <MenuCard
-            href="/courier/pickup"
-            icon="🏪"
-            title="للاستلام من المحلات"
-            sub="ثم سلّمها للمستودع"
-            badge={readyCount + carryingCount}
-          />
-        )}
-        {doWh && (
-          <MenuCard
-            href="/courier/receive"
-            icon="📥"
-            title="استلام بالمستودع"
-            sub="طرود المناديب"
-            badge={incomingParcels}
-          />
-        )}
-        {doWh && (
-          <MenuCard href="/courier/pack" icon="📦" title="تجهيز الطلبات" sub="تجميع وتغليف" badge={toPackCount} />
-        )}
-        {doPickup && (
-          <MenuCard
-            href="/courier/deliver"
-            icon="🛵"
-            title="التوصيل للزبائن"
-            sub="من المستودع للزبون"
-            badge={availableCount + mineCount}
-          />
-        )}
-        {doPickup && history && (
-          <MenuCard href="/courier/history" icon="🧾" title="سجل التوصيل" sub={`${jd(history.todayTotal)} اليوم`} />
-        )}
+        <MenuCard
+          href="/courier/pickup"
+          icon="🏪"
+          title="للاستلام من المحلات"
+          sub="ثم سلّمها للمستودع"
+          badge={readyCount + carryingCount}
+        />
+        <MenuCard
+          href="/courier/deliver"
+          icon="🛵"
+          title="التوصيل للزبائن"
+          sub="من المستودع للزبون"
+          badge={availableCount + mineCount}
+        />
+        <MenuCard href="/courier/history" icon="🧾" title="سجل التوصيل" sub={`${jd(history.todayTotal)} اليوم`} />
       </MenuGrid>
 
       <details style={{ marginTop: 20 }}>
