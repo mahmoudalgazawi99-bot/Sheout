@@ -3,12 +3,12 @@
 import { useRouter } from 'next/navigation';
 import { theme } from '@/lib/theme';
 
-export default function CourierLogout() {
+export default function CourierLogout({ to = '/courier/login' }) {
   const router = useRouter();
 
   async function logout() {
     await fetch('/api/courier/logout', { method: 'POST' });
-    router.push('/courier/login');
+    router.push(to);
     router.refresh();
   }
 
