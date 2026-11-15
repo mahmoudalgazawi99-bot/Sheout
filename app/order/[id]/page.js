@@ -13,22 +13,22 @@ export const dynamic = 'force-dynamic';
 // Put the support phone number here to show it on the page (example: '0790000000')
 const SUPPORT_PHONE = '';
 
-const STAGES = ['new', 'confirmed', 'ready', 'picked_up', 'delivered'];
+const STAGES = ['new', 'prep', 'warehouse', 'out', 'delivered'];
 
 const LABELS = {
   ar: {
     new: 'تم استلام الطلب',
-    confirmed: 'قيد التجهيز',
-    ready: 'جاهز',
-    picked_up: 'بالطريق إليك',
+    prep: 'قيد التجهيز',
+    warehouse: 'وصل المستودع',
+    out: 'بالطريق إليك',
     delivered: 'تم التوصيل',
     cancelled: 'ملغي',
   },
   en: {
     new: 'Order received',
-    confirmed: 'Preparing',
-    ready: 'Ready',
-    picked_up: 'On the way',
+    prep: 'Preparing',
+    warehouse: 'At our warehouse',
+    out: 'On the way',
     delivered: 'Delivered',
     cancelled: 'Cancelled',
   },
@@ -42,11 +42,19 @@ function firstImage(images) {
   return null;
 }
 
-function stageOf(subs) {
+function itemKey(sub, outNow) {
+  if (sub.status === 'cancelled') return 'cancelled';
+  if (sub.status === 'delivered') return 'delivered';
+  if (sub.status === 'new') return 'new';
+  if (sub.status === 'picked_up' && sub.at_warehouse_at) return outNow ? 'out' : 'warehouse';
+  return 'prep';
+}
+
+function stageOf(subs, outNow) {
   const active = subs.filter((s) => s.status !== 'cancelled');
   if (subs.length > 0 && active.length === 0) return -1;
   if (active.length === 0) return 0;
-  return Math.min(...active.map((s) => Math.max(0, STAGES.indexOf(s.status))));
+  return Math.min(...active.map((s) => STAGES.indexOf(itemKey(s, outNow))));
 }
 
 const sectionBox = {
@@ -66,7 +74,7 @@ export default async function OrderPage({ params }) {
 
   const { data: order } = await supabaseAdmin
     .from('orders')
-    .select('id, order_no, subtotal, delivery_fee, total, customers(member_no)')
+    .select('id, order_no, subtotal, delivery_fee, total, out_for_delivery_at, customers(member_no)')
     .eq('id', id)
     .maybeSingle();
 
@@ -89,7 +97,9 @@ export default async function OrderPage({ params }) {
 
   const { data: subOrders } = await supabaseAdmin
     .from('sub_orders')
-    .select('id, status, order_items(product_id, quantity, price, size, color, products(name, name_ar, images))')
+    .select(
+      'id, status, at_warehouse_at, order_items(product_id, quantity, price, size, color, products(name, name_ar, images))'
+    )
     .eq('order_id', id);
 
   let complaints = [];
@@ -108,9 +118,12 @@ export default async function OrderPage({ params }) {
     reviews = rv ?? [];
   } catch {}
 
+  const outNow = !!order.out_for_delivery_at;
   const subs = subOrders ?? [];
-  const stage = stageOf(subs);
-  const items = subs.flatMap((so) => (so.order_items ?? []).map((it) => ({ ...it, status: so.status })));
+  const stage = stageOf(subs, outNow);
+  const items = subs.flatMap((so) =>
+    (so.order_items ?? []).map((it) => ({ ...it, status: so.status, key: itemKey(so, outNow) }))
+  );
   const orderNo = order.order_no || String(order.id).slice(0, 8).toUpperCase();
   const memberNo = order.customers ? order.customers.member_no : null;
 
@@ -254,11 +267,11 @@ export default async function OrderPage({ params }) {
                   style={{
                     fontSize: 12,
                     marginTop: 4,
-                    color: it.status === 'cancelled' ? '#b00' : theme.gold,
+                    color: it.key === 'cancelled' ? '#b00' : theme.gold,
                     fontWeight: 600,
                   }}
                 >
-                  {L[it.status] || it.status}
+                  {L[it.key] || it.key}
                 </div>
               </div>
               <b style={{ fontSize: 14 }}>{money(lang, it.price * it.quantity)}</b>
