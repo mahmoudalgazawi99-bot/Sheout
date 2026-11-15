@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { getCourierSession, canWarehouse } from '@/lib/courierauth';
+import { sendToWarehouse } from '@/lib/push';
 
 const fail = (message, status) => NextResponse.json({ error: message }, { status });
 
@@ -45,6 +46,22 @@ export async function POST(request) {
 
   const active = (all ?? []).filter((s) => s.status !== 'cancelled');
   const complete = active.length > 0 && active.every((s) => s.status === 'picked_up' && s.at_warehouse_at);
+
+  if (complete) {
+    try {
+      const { data: ord } = await supabaseAdmin
+        .from('orders')
+        .select('order_no')
+        .eq('id', sub.order_id)
+        .maybeSingle();
+      const orderNo = (ord && ord.order_no) || String(sub.order_id).slice(0, 8).toUpperCase();
+      await sendToWarehouse({
+        title: 'طلب مكتمل بالمستودع',
+        body: `#${orderNo} · كل الطرود وصلت · جاهز للتجهيز`,
+        url: '/warehouse/pack',
+      });
+    } catch {}
+  }
 
   return NextResponse.json({ ok: true, complete });
 }
