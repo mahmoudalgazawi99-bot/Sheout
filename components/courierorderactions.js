@@ -58,14 +58,52 @@ function Action({ url, body, label, busyLabel, confirmText, dark, after }) {
   );
 }
 
-export function PickupButton({ subOrderId }) {
+export function PickupButton({ ids, label }) {
   return (
     <Action
       url="/api/courier/pickup"
-      body={{ subOrderId }}
-      label="استلمت الطرد"
+      body={{ subOrderIds: ids }}
+      label={label || 'استلمت الطرد'}
       busyLabel="جارٍ التأكيد..."
-      confirmText="تأكيد استلام الطرد من المحل؟"
+      confirmText="تأكيد الاستلام من المحل؟"
+    />
+  );
+}
+
+export function ReceiveButton({ subOrderId }) {
+  return (
+    <Action
+      url="/api/warehouse/receive"
+      body={{ subOrderId }}
+      label="استلمت الطرد بالمستودع"
+      busyLabel="جارٍ التأكيد..."
+      confirmText="تأكيد استلام الطرد بالمستودع؟"
+    />
+  );
+}
+
+export function PackButton({ orderId }) {
+  return (
+    <Action
+      dark
+      url="/api/warehouse/pack"
+      body={{ orderId }}
+      label="تم التجهيز والتغليف"
+      busyLabel="جارٍ التأكيد..."
+      confirmText="تأكد إنو كل القطع موجودة ومغلّفة بطرد وحد. تأكيد؟"
+    />
+  );
+}
+
+export function TakeButton({ orderId }) {
+  return (
+    <Action
+      dark
+      url="/api/courier/take"
+      body={{ orderId }}
+      label="استلمت الطلب من المستودع"
+      busyLabel="جارٍ التأكيد..."
+      confirmText="تأكيد استلام الطلب من المستودع؟"
     />
   );
 }
