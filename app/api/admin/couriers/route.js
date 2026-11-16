@@ -5,6 +5,7 @@ import { isAdmin } from '@/lib/adminauth';
 import { hashPassword } from '@/lib/storeauth';
 
 const ALPHABET = 'abcdefghjkmnpqrstuvwxyz23456789';
+const ROLES = ['courier', 'warehouse', 'both'];
 
 function newPassword() {
   let s = '';
@@ -29,7 +30,8 @@ export async function POST(request) {
   if (action === 'create') {
     const name = String(body.name || '').trim().slice(0, 60);
     const username = String(body.username || '').trim().toLowerCase();
-    if (name.length < 2) return fail('Please enter the courier name');
+    const role = ROLES.includes(body.role) ? body.role : 'courier';
+    if (name.length < 2) return fail('Please enter the name');
     if (!/^[a-z0-9_.-]{3,30}$/.test(username)) {
       return fail('Username must be 3-30 characters: letters, numbers, dot, dash or underscore');
     }
@@ -37,7 +39,7 @@ export async function POST(request) {
     const password = newPassword();
     const { error } = await supabaseAdmin
       .from('courier_accounts')
-      .insert({ name, username, password_hash: hashPassword(password) });
+      .insert({ name, username, role, password_hash: hashPassword(password) });
 
     if (error) {
       if (error.code === '23505') return fail('Username already taken');
@@ -79,6 +81,16 @@ export async function POST(request) {
       .eq('id', accountId);
     if (error) return fail('Could not update account', 500);
     return NextResponse.json({ ok: true, is_active: !account.is_active });
+  }
+
+  if (action === 'set_role') {
+    const accountId = String(body.accountId || '');
+    const role = String(body.role || '');
+    if (!ROLES.includes(role)) return fail('Invalid role');
+
+    const { error } = await supabaseAdmin.from('courier_accounts').update({ role }).eq('id', accountId);
+    if (error) return fail('Could not update role', 500);
+    return NextResponse.json({ ok: true });
   }
 
   return fail('Unknown action');
