@@ -3,6 +3,12 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
+const ROLE_LABEL = {
+  courier: 'Courier (مندوب)',
+  warehouse: 'Warehouse (مستودع)',
+  both: 'Both (الاثنين)',
+};
+
 export default function CourierAccounts({ couriers }) {
   const router = useRouter();
   const [busy, setBusy] = useState('');
@@ -10,6 +16,7 @@ export default function CourierAccounts({ couriers }) {
   const [reveal, setReveal] = useState(null);
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
+  const [role, setRole] = useState('courier');
   const [copied, setCopied] = useState(false);
 
   async function call(body, busyKey) {
@@ -37,9 +44,9 @@ export default function CourierAccounts({ couriers }) {
   }
 
   async function create() {
-    const data = await call({ action: 'create', name, username }, 'create');
+    const data = await call({ action: 'create', name, username, role }, 'create');
     if (data && data.password) {
-      setReveal({ username: data.username, password: data.password });
+      setReveal({ username: data.username, password: data.password, role });
       setCopied(false);
       setName('');
       setUsername('');
@@ -56,6 +63,10 @@ export default function CourierAccounts({ couriers }) {
 
   async function toggle(accountId) {
     await call({ action: 'toggle', accountId }, `t-${accountId}`);
+  }
+
+  async function changeRole(accountId, next) {
+    await call({ action: 'set_role', accountId, role: next }, `s-${accountId}`);
   }
 
   async function copy(text) {
@@ -83,10 +94,12 @@ export default function CourierAccounts({ couriers }) {
 
       {reveal && (
         <div style={{ background: '#fff7e0', border: '1px solid #e2c36b', borderRadius: 12, padding: 14, marginBottom: 16 }}>
-          <b>Send these to the courier. The password is shown only once.</b>
+          <b>Send these privately. The password is shown only once.</b>
           <div style={{ marginTop: 8, lineHeight: 2 }}>
             <div>Username: <b>{reveal.username}</b></div>
             <div>Password: <b style={{ letterSpacing: 1 }}>{reveal.password}</b></div>
+            {reveal.role === 'warehouse' && <div>App: <b>/warehouse/login</b></div>}
+            {reveal.role === 'courier' && <div>App: <b>/courier/login</b></div>}
           </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
             <button
@@ -102,7 +115,7 @@ export default function CourierAccounts({ couriers }) {
       )}
 
       <section style={{ border: '1px solid #eee', borderRadius: 12, padding: 12, marginBottom: 16, background: '#fff' }}>
-        <h3 style={{ margin: '0 0 8px' }}>New courier</h3>
+        <h3 style={{ margin: '0 0 8px' }}>New account</h3>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <input placeholder="name" value={name} onChange={(e) => setName(e.target.value)} style={field} />
           <input
@@ -113,6 +126,13 @@ export default function CourierAccounts({ couriers }) {
             autoCorrect="off"
             style={field}
           />
+        </div>
+        <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+          <select value={role} onChange={(e) => setRole(e.target.value)} style={field}>
+            <option value="courier">{ROLE_LABEL.courier}</option>
+            <option value="warehouse">{ROLE_LABEL.warehouse}</option>
+            <option value="both">{ROLE_LABEL.both}</option>
+          </select>
           <button
             type="button"
             style={{ ...btn, background: '#111', color: '#fff' }}
@@ -124,7 +144,7 @@ export default function CourierAccounts({ couriers }) {
         </div>
       </section>
 
-      {couriers.length === 0 && <p style={{ color: '#777' }}>No couriers yet.</p>}
+      {couriers.length === 0 && <p style={{ color: '#777' }}>No accounts yet.</p>}
 
       {couriers.map((c) => (
         <section key={c.id} style={{ border: '1px solid #eee', borderRadius: 12, padding: 12, marginBottom: 12, background: '#fff' }}>
@@ -132,6 +152,18 @@ export default function CourierAccounts({ couriers }) {
           <div style={{ fontSize: 14 }}>
             Username: <b>{c.username}</b>{' '}
             <span style={{ color: c.is_active ? '#177a3c' : '#b00' }}>({c.is_active ? 'active' : 'disabled'})</span>
+          </div>
+          <div style={{ marginTop: 8 }}>
+            <select
+              value={c.role || 'both'}
+              disabled={busy === `s-${c.id}`}
+              onChange={(e) => changeRole(c.id, e.target.value)}
+              style={{ padding: 8, borderRadius: 8, border: '1px solid #ddd', fontSize: 14 }}
+            >
+              <option value="courier">{ROLE_LABEL.courier}</option>
+              <option value="warehouse">{ROLE_LABEL.warehouse}</option>
+              <option value="both">{ROLE_LABEL.both}</option>
+            </select>
           </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
             <button type="button" style={btn} disabled={busy === `r-${c.id}`} onClick={() => reset(c.id)}>
