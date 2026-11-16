@@ -34,7 +34,21 @@ export async function POST(request) {
     .eq('order_no', code)
     .limit(1);
 
-  const o = (data ?? [])[0];
+  let o = (data ?? [])[0];
+
+  if (!o) {
+    const { data: al } = await supabaseAdmin.from('order_aliases').select('new_id').eq('old_no', code).limit(1);
+    const nid = al && al[0] ? al[0].new_id : null;
+    if (nid) {
+      const { data: d2 } = await supabaseAdmin
+        .from('orders')
+        .select('id, customers(phone, phone_norm)')
+        .eq('id', nid)
+        .limit(1);
+      o = (d2 ?? [])[0];
+    }
+  }
+
   if (!o) return notFound();
 
   const c = o.customers || {};
