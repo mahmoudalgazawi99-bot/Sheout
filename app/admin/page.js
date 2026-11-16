@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { isAdmin } from '@/lib/adminauth';
 import { dayKey } from '@/lib/analytics';
+import { loadMergeGroups } from '@/lib/mergegroups';
 import AdminLogout from '@/components/adminlogout';
 import PushSetup from '@/components/pushsetup';
 import AutoRefresh from '@/components/autorefresh';
@@ -16,12 +17,13 @@ export default async function AdminHome() {
   const start = new Date(`${dayKey(new Date())}T00:00:00+03:00`).toISOString();
   const head = { count: 'exact', head: true };
 
-  const [today, active, ready, issuesRes, complaintsRes] = await Promise.all([
+  const [today, active, ready, issuesRes, complaintsRes, mergeGroups] = await Promise.all([
     supabaseAdmin.from('orders').select('id', head).gte('created_at', start),
     supabaseAdmin.from('orders').select('id', head).not('status', 'in', '(delivered,cancelled)'),
     supabaseAdmin.from('sub_orders').select('id', head).eq('status', 'ready'),
     supabaseAdmin.from('order_issues').select('id', head).eq('status', 'open'),
     supabaseAdmin.from('complaints').select('id', head).neq('status', 'resolved'),
+    loadMergeGroups().catch(() => []),
   ]);
 
   const todayCount = today.count || 0;
@@ -54,6 +56,14 @@ export default async function AdminHome() {
 
       <MenuGrid>
         <MenuCard href="/admin/orders" icon="📦" title="الطلبات" sub="الطلبات الحالية والبحث" badge={activeCount} />
+        <MenuCard href="/admin/warehouse" icon="🏭" title="متابعة المستودع" sub="المراحل والتأخير" />
+        <MenuCard
+          href="/admin/merge"
+          icon="🔗"
+          title="دمج الطلبات"
+          sub="نفس الزبون ونفس اليوم"
+          badge={mergeGroups.length}
+        />
         <MenuCard href="/admin/analytics" icon="📊" title="التحليلات" sub="المبيعات والأداء" />
         <MenuCard
           href="/admin/issues"
@@ -73,7 +83,7 @@ export default async function AdminHome() {
         />
         <MenuCard href="/admin/customers" icon="👤" title="العملاء" sub="بروفايل وملاحظات" />
         <MenuCard href="/admin/reviews" icon="⭐" title="تعليقات المنتجات" sub="إظهار وإخفاء" />
-        <MenuCard href="/admin/couriers" icon="🛵" title="المناديب" sub="الحسابات والتفعيل" />
+        <MenuCard href="/admin/couriers" icon="🛵" title="المناديب والمستودع" sub="الحسابات والأدوار" />
         <MenuCard href="/admin/stores" icon="🏪" title="حسابات المحلات" sub="يوزر وكلمة سر لكل محل" />
       </MenuGrid>
 
