@@ -29,9 +29,17 @@ export default async function StoreHome() {
     .select('id, name, quantity, status, order_items(count)')
     .eq('store_id', account.store_id);
 
+  const unreadRes = await supabaseAdmin
+    .from('store_messages')
+    .select('id', { count: 'exact', head: true })
+    .eq('store_id', account.store_id)
+    .eq('sender', 'admin')
+    .is('read_at', null);
+
   const live = computeStoreLive(subs ?? []);
   const stock = summarizeStock(products ?? []);
   const stockAlerts = stock.out.length + stock.low.length;
+  const unread = unreadRes.error ? 0 : unreadRes.count || 0;
 
   return (
     <main style={{ maxWidth: 720, margin: '0 auto', padding: 16 }}>
@@ -90,10 +98,19 @@ export default async function StoreHome() {
           badge={stockAlerts}
           alert={stockAlerts > 0}
         />
+        <MenuCard
+          href="/store/chat"
+          icon="💬"
+          title="المحادثة مع الإدارة"
+          sub="منتج جديد واستفسارات"
+          badge={unread}
+          alert={unread > 0}
+        />
+        <MenuCard href="/store/statement" icon="💰" title="كشف الحساب" sub="المستحقات والدفعات" />
       </MenuGrid>
 
       <p style={{ marginTop: 28, fontSize: 12, color: theme.muted, textAlign: 'center' }}>
-        للمشاكل أو الاستفسارات تواصل مع إدارة المنصة.
+        للمشاكل أو الاستفسارات راسل الإدارة من المحادثة.
       </p>
     </main>
   );
