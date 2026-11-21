@@ -17,12 +17,13 @@ export default async function AdminHome() {
   const start = new Date(`${dayKey(new Date())}T00:00:00+03:00`).toISOString();
   const head = { count: 'exact', head: true };
 
-  const [today, active, ready, issuesRes, complaintsRes, mergeGroups] = await Promise.all([
+  const [today, active, ready, issuesRes, complaintsRes, chatsRes, mergeGroups] = await Promise.all([
     supabaseAdmin.from('orders').select('id', head).gte('created_at', start),
     supabaseAdmin.from('orders').select('id', head).not('status', 'in', '(delivered,cancelled)'),
     supabaseAdmin.from('sub_orders').select('id', head).eq('status', 'ready'),
     supabaseAdmin.from('order_issues').select('id', head).eq('status', 'open'),
     supabaseAdmin.from('complaints').select('id', head).neq('status', 'resolved'),
+    supabaseAdmin.from('store_messages').select('id', head).eq('sender', 'store').is('read_at', null),
     loadMergeGroups().catch(() => []),
   ]);
 
@@ -31,6 +32,7 @@ export default async function AdminHome() {
   const readyCount = ready.count || 0;
   const issueCount = issuesRes.error ? 0 : issuesRes.count || 0;
   const complaintCount = complaintsRes.error ? 0 : complaintsRes.count || 0;
+  const chatCount = chatsRes.error ? 0 : chatsRes.count || 0;
 
   return (
     <main dir="rtl" lang="ar" style={{ maxWidth: 720, margin: '0 auto', padding: 16 }}>
@@ -64,6 +66,15 @@ export default async function AdminHome() {
           sub="نفس الزبون ونفس اليوم"
           badge={mergeGroups.length}
         />
+        <MenuCard
+          href="/admin/chats"
+          icon="🗨️"
+          title="محادثات المحلات"
+          sub="منتجات جديدة واستفسارات"
+          badge={chatCount}
+          alert={chatCount > 0}
+        />
+        <MenuCard href="/admin/settlements" icon="💰" title="التسويات" sub="نقد المناديب ومستحقات المحلات" />
         <MenuCard href="/admin/analytics" icon="📊" title="التحليلات" sub="المبيعات والأداء" />
         <MenuCard
           href="/admin/issues"
