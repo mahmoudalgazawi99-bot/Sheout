@@ -8,11 +8,11 @@ import { theme } from '@/lib/theme';
 import { useLang } from '@/components/LangProvider';
 import LangToggle from '@/components/LangToggle';
 import { t, money, translateError } from '@/lib/i18n';
-
-const DELIVERY_FEE = 3;
+import { deliveryFeeFor, amountToFree } from '@/lib/shipping';
 
 export default function CheckoutPage() {
   const lang = useLang();
+  const ar = lang === 'ar';
   const router = useRouter();
   const [items, setItems] = useState([]);
   const [ready, setReady] = useState(false);
@@ -29,7 +29,9 @@ export default function CheckoutPage() {
   }, []);
 
   const subtotal = items.reduce((s, i) => s + i.price * i.qty, 0);
-  const total = subtotal + DELIVERY_FEE;
+  const fee = deliveryFeeFor(subtotal);
+  const left = amountToFree(subtotal);
+  const total = subtotal + fee;
 
   const input = {
     width: '100%',
@@ -85,7 +87,7 @@ export default function CheckoutPage() {
     <main style={{ maxWidth: 720, margin: '0 auto', padding: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Link href="/cart" style={{ color: theme.ink, textDecoration: 'none', fontSize: 14 }}>
-          {lang === 'ar' ? '→ ' : '← '}
+          {ar ? '→ ' : '← '}
           {t(lang, 'backToCart')}
         </Link>
         <LangToggle />
@@ -107,7 +109,7 @@ export default function CheckoutPage() {
           <label style={label}>
             {t(lang, 'phone')}
             <input
-              style={{ ...input, textAlign: lang === 'ar' ? 'right' : 'left' }}
+              style={{ ...input, textAlign: ar ? 'right' : 'left' }}
               dir="ltr"
               type="tel"
               value={phone}
@@ -145,8 +147,15 @@ export default function CheckoutPage() {
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span>{t(lang, 'delivery')}</span>
-              <span>{money(lang, DELIVERY_FEE)}</span>
+              <span style={fee === 0 ? { color: '#177a3c', fontWeight: 700 } : undefined}>
+                {fee === 0 ? (ar ? 'مجاني' : 'Free') : money(lang, fee)}
+              </span>
             </div>
+            {left > 0 && (
+              <div style={{ fontSize: 12, color: theme.muted }}>
+                {ar ? `أضف ${money(lang, left)} للتوصيل المجاني` : `Add ${money(lang, left)} more for free delivery`}
+              </div>
+            )}
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 20 }}>
               <b style={{ fontFamily: theme.serif }}>{t(lang, 'total')}</b>
               <b>{money(lang, total)}</b>
