@@ -58,6 +58,7 @@ export default async function AdminHome() {
 
       <MenuGrid>
         <MenuCard href="/admin/orders" icon="📦" title="الطلبات" sub="الطلبات الحالية والبحث" badge={activeCount} />
+        <MenuCard href="/admin/products" icon="👗" title="المنتجات" sub="صور ومقاسات وفيديو" />
         <MenuCard href="/admin/warehouse" icon="🏭" title="متابعة المستودع" sub="المراحل والتأخير" />
         <MenuCard
           href="/admin/merge"
