@@ -23,6 +23,10 @@ export async function GET(request) {
     background = '#4a3f6b';
     color = '#faf6ef';
     letter = 'W';
+  } else if (variant === 'shop') {
+    background = '#faf6ef';
+    color = '#b8924a';
+    letter = 'S';
   }
 
   return new ImageResponse(
