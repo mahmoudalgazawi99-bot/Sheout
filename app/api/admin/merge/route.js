@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { isAdmin } from '@/lib/adminauth';
 import { dayKey, toDate } from '@/lib/analytics';
 import { refreshOrderStatus } from '@/lib/orderstatus';
+import { deliveryFeeFor } from '@/lib/shipping';
 
 const fail = (message, status = 400) => NextResponse.json({ error: message }, { status });
 const r2 = (n) => Math.round(n * 100) / 100;
@@ -78,7 +79,7 @@ export async function POST(request) {
   }
 
   const subtotal = r2(orders.reduce((s, o) => s + (Number(o.subtotal) || 0), 0));
-  const fee = Number(primary.delivery_fee) || 0;
+  const fee = deliveryFeeFor(subtotal);
   const noteParts = [
     primary.notes,
     ...others.map((o) => `دُمج مع #${o.order_no}`),
@@ -87,13 +88,13 @@ export async function POST(request) {
 
   const { error: updError } = await supabaseAdmin
     .from('orders')
-    .update({ subtotal, total: r2(subtotal + fee), notes: noteParts.join(' | ').slice(0, 500) })
+    .update({ subtotal, delivery_fee: fee, total: r2(subtotal + fee), notes: noteParts.join(' | ').slice(0, 500) })
     .eq('id', primaryId);
   if (updError) return fail('تعذّر تحديث الطلب الأساسي', 500);
 
   await supabaseAdmin.from('orders').delete().in('id', otherIds);
   await refreshOrderStatus(primaryId);
 
-  const saved = r2(others.reduce((s, o) => s + (Number(o.delivery_fee) || 0), 0));
-  return NextResponse.json({ ok: true, saved });
+  const before = orders.reduce((s, o) => s + (Number(o.delivery_fee) || 0), 0);
+  return NextResponse.json({ ok: true, saved: r2(Math.max(0, before - fee)) });
 }
