@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getCourierSession, canPickup, roleLabel } from '@/lib/courierauth';
 import { loadPickup, loadDelivery, loadCourierHistory } from '@/lib/courierdata';
+import { loadMyCash } from '@/lib/couriercash';
 import CourierLogout from '@/components/courierlogout';
 import PushSetup from '@/components/pushsetup';
 import { MenuGrid, MenuCard, StatStrip, Banner } from '@/components/appmenu';
@@ -17,6 +18,7 @@ export default async function CourierHome() {
   const pickup = await loadPickup(account.id);
   const delivery = await loadDelivery(account.id);
   const history = await loadCourierHistory(account.id);
+  const cash = await loadMyCash(account.id);
 
   const readyCount = pickup.readyCount;
   const carryingCount = pickup.carrying.length;
@@ -69,6 +71,13 @@ export default async function CourierHome() {
           title="التوصيل للزبائن"
           sub="من المستودع للزبون"
           badge={availableCount + mineCount}
+        />
+        <MenuCard
+          href="/courier/cash"
+          icon="💵"
+          title="رصيدي النقدي"
+          sub={cash.balance > 0.009 ? `بذمّتك ${jd(cash.balance)}` : 'ما عليك شي'}
+          alert={cash.balance > 0.009}
         />
         <MenuCard href="/courier/history" icon="🧾" title="سجل التوصيل" sub={`${jd(history.todayTotal)} اليوم`} />
       </MenuGrid>
