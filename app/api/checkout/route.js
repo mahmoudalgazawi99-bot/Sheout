@@ -4,8 +4,7 @@ import { sendToAccounts, sendToAdmins } from '@/lib/push';
 import { clientKey, isLimited } from '@/lib/ratelimit';
 import { dayKey } from '@/lib/analytics';
 import { normalizePhone } from '@/lib/phone';
-
-const DELIVERY_FEE = 3;
+import { deliveryFeeFor } from '@/lib/shipping';
 
 const r2 = (n) => Math.round(n * 100) / 100;
 const bad = (message, status = 400) => NextResponse.json({ error: message }, { status });
@@ -125,7 +124,8 @@ export async function POST(request) {
   }
 
   const subtotal = r2(Object.values(groups).reduce((s, g) => s + g.subtotal, 0));
-  const total = r2(subtotal + DELIVERY_FEE);
+  const deliveryFee = deliveryFeeFor(subtotal);
+  const total = r2(subtotal + deliveryFee);
 
   let customerId = null;
   let createdCustomer = false;
@@ -176,7 +176,7 @@ export async function POST(request) {
         customer_id: customerId,
         order_no: `${prefix}${seq}`,
         subtotal,
-        delivery_fee: DELIVERY_FEE,
+        delivery_fee: deliveryFee,
         total,
         address,
         notes: notes || null,
