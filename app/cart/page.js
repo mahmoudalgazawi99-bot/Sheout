@@ -7,9 +7,11 @@ import { theme } from '@/lib/theme';
 import { useLang } from '@/components/LangProvider';
 import LangToggle from '@/components/LangToggle';
 import { t, money, pick, sizeLabel, colorLabel } from '@/lib/i18n';
+import { deliveryFeeFor, amountToFree, FREE_DELIVERY_FROM } from '@/lib/shipping';
 
 export default function CartPage() {
   const lang = useLang();
+  const ar = lang === 'ar';
   const [items, setItems] = useState([]);
   const [ready, setReady] = useState(false);
 
@@ -22,6 +24,8 @@ export default function CartPage() {
   }, []);
 
   const total = items.reduce((sum, i) => sum + i.price * i.qty, 0);
+  const fee = deliveryFeeFor(total);
+  const left = amountToFree(total);
 
   const qtyBtn = {
     width: 34,
@@ -37,7 +41,7 @@ export default function CartPage() {
     <main style={{ maxWidth: 720, margin: '0 auto', padding: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Link href="/" style={{ color: theme.ink, textDecoration: 'none', fontSize: 14 }}>
-          {lang === 'ar' ? '→ ' : '← '}
+          {ar ? '→ ' : '← '}
           {t(lang, 'backTo')}
         </Link>
         <LangToggle />
@@ -48,6 +52,41 @@ export default function CartPage() {
       </div>
 
       {ready && items.length === 0 && <p style={{ color: theme.muted }}>{t(lang, 'cartEmpty')}</p>}
+
+      {items.length > 0 && (
+        <div
+          style={{
+            background: theme.goldSoft,
+            borderRadius: 12,
+            padding: '10px 14px',
+            marginBottom: 14,
+            fontSize: 14,
+          }}
+        >
+          {left > 0 ? (
+            <>
+              <div>
+                🚚{' '}
+                {ar
+                  ? `أضف ${money(lang, left)} للحصول على توصيل مجاني`
+                  : `Add ${money(lang, left)} more for free delivery`}
+              </div>
+              <div style={{ height: 6, background: '#fff', borderRadius: 3, marginTop: 8 }}>
+                <div
+                  style={{
+                    width: `${Math.min(100, (total / FREE_DELIVERY_FROM) * 100)}%`,
+                    height: '100%',
+                    background: theme.gold,
+                    borderRadius: 3,
+                  }}
+                />
+              </div>
+            </>
+          ) : (
+            <b>🎉 {ar ? 'توصيلك مجاني!' : 'Your delivery is free!'}</b>
+          )}
+        </div>
+      )}
 
       {items.length > 0 && (
         <section
@@ -103,7 +142,13 @@ export default function CartPage() {
             <b>{money(lang, total)}</b>
           </div>
           <div style={{ fontSize: 12, color: theme.muted, marginTop: 4 }}>
-            {lang === 'ar' ? 'تُضاف رسوم التوصيل عند إتمام الطلب' : 'Delivery fee is added at checkout'}
+            {fee > 0
+              ? ar
+                ? `تُضاف رسوم التوصيل (${money(lang, fee)}) عند إتمام الطلب`
+                : `Delivery fee (${money(lang, fee)}) is added at checkout`
+              : ar
+                ? 'التوصيل مجاني'
+                : 'Free delivery'}
           </div>
           <Link
             href="/checkout"
