@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { getStoreSession } from '@/lib/storeauth';
+import { hasAccepted } from '@/lib/agreement';
 import StoreLogout from '@/components/storelogout';
 import PushSetup from '@/components/pushsetup';
 import StoreBell from '@/components/storebell';
@@ -15,6 +16,7 @@ export const dynamic = 'force-dynamic';
 export default async function StoreHome() {
   const account = await getStoreSession();
   if (!account) redirect('/store/login');
+  if (!(await hasAccepted(account.store_id))) redirect('/store/agreement');
 
   const storeName = (account.stores && (account.stores.name_ar || account.stores.name)) || '';
 
@@ -90,6 +92,7 @@ export default async function StoreHome() {
       <MenuGrid>
         <MenuCard href="/store/orders" icon="📥" title="الطلبات" sub="جديدة وقيد التجهيز والسجل" badge={live.waiting} />
         <MenuCard href="/store/stats" icon="📈" title="الإحصائيات" sub="المبيعات والأكثر طلباً" />
+        <MenuCard href="/store/performance" icon="🏅" title="بطاقة الأداء" sub="علامتك وترتيبك" />
         <MenuCard
           href="/store/stock"
           icon="📦"
@@ -107,6 +110,7 @@ export default async function StoreHome() {
           alert={unread > 0}
         />
         <MenuCard href="/store/statement" icon="💰" title="كشف الحساب" sub="المستحقات والدفعات" />
+        <MenuCard href="/store/agreement" icon="📄" title="الاتفاقية" sub="شروط التعامل" />
       </MenuGrid>
 
       <p style={{ marginTop: 28, fontSize: 12, color: theme.muted, textAlign: 'center' }}>
