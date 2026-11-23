@@ -2,11 +2,21 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
 import CartLink from '@/components/CartLink';
 import LangToggle from '@/components/LangToggle';
+import InstallPrompt from '@/components/InstallPrompt';
 import { getLang } from '@/lib/serverlang';
 import { t, money, pick } from '@/lib/i18n';
 import { theme } from '@/lib/theme';
 
 export const dynamic = 'force-dynamic';
+
+export const metadata = {
+  icons: { apple: '/api/store/icon?size=180&variant=shop' },
+  appleWebApp: { capable: true, title: 'Sheout', statusBarStyle: 'default' },
+};
+
+export const viewport = {
+  themeColor: '#faf6ef',
+};
 
 const CATEGORIES = ['Women', 'Men', 'Kids', 'Shoes', 'Sports', 'Accessories'];
 
@@ -103,6 +113,8 @@ export default async function Home() {
           <CartLink />
         </div>
       </div>
+
+      <InstallPrompt lang={lang} />
 
       <form action="/search" method="GET" style={{ marginTop: 16 }}>
         <input
