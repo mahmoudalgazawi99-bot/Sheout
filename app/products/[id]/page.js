@@ -4,10 +4,14 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import AddToCart from '@/components/AddToCart';
 import CartLink from '@/components/CartLink';
 import LangToggle from '@/components/LangToggle';
+import ProductGallery from '@/components/ProductGallery';
+import SizeGuide from '@/components/sizeguide';
 import { getLang } from '@/lib/serverlang';
 import { t, money, pick } from '@/lib/i18n';
 import { toDate } from '@/lib/analytics';
 import { stars } from '@/lib/feedback';
+import { SITE_URL } from '@/lib/site';
+import { FREE_DELIVERY_FROM } from '@/lib/shipping';
 import { theme } from '@/lib/theme';
 
 export const dynamic = 'force-dynamic';
@@ -24,16 +28,55 @@ function toList(v) {
   return [];
 }
 
+export async function generateMetadata({ params }) {
+  const { id } = await params;
+  const lang = await getLang();
+  const { data: p } = await supabase
+    .from('products')
+    .select('id, name, name_ar, description, price, sale_price, images, status')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (!p || p.status !== 'active') return { title: 'SHEOUT' };
+
+  const name = pick(lang, p.name, p.name_ar);
+  const img = toImageList(p.images)[0];
+  const desc = [
+    money(lang, p.sale_price || p.price),
+    p.description ? String(p.description).slice(0, 120) : lang === 'ar' ? 'أزياء عصرية من الأردن' : 'Modern fashion from Jordan',
+  ].join(' · ');
+  const title = `${name} | SHEOUT`;
+  const url = `${SITE_URL}/products/${p.id}`;
+
+  return {
+    metadataBase: new URL(SITE_URL),
+    title,
+    description: desc,
+    alternates: { canonical: url },
+    openGraph: {
+      title,
+      description: desc,
+      url,
+      siteName: 'SHEOUT',
+      type: 'website',
+      locale: lang === 'ar' ? 'ar_JO' : 'en_US',
+      images: img ? [{ url: img, alt: name }] : [],
+    },
+    twitter: {
+      card: img ? 'summary_large_image' : 'summary',
+      title,
+      description: desc,
+      images: img ? [img] : [],
+    },
+  };
+}
+
 export default async function ProductPage({ params }) {
   const lang = await getLang();
   const ar = lang === 'ar';
   const { id } = await params;
 
-  const { data: product } = await supabase
-    .from('products')
-    .select('id, name, name_ar, description, category, price, sale_price, sizes, colors, quantity, images, status')
-    .eq('id', id)
-    .maybeSingle();
+  const { data: product } = await supabase.from('products').select('*').eq('id', id).maybeSingle();
 
   const wrap = { maxWidth: 720, margin: '0 auto', padding: 16 };
   const topBar = (
@@ -83,28 +126,7 @@ export default async function ProductPage({ params }) {
     <main style={wrap}>
       {topBar}
 
-      <img
-        src={images[0] || ''}
-        alt={productName}
-        style={{
-          width: '100%',
-          aspectRatio: '4 / 5',
-          objectFit: 'cover',
-          borderRadius: theme.radius,
-          background: theme.goldSoft,
-          display: 'block',
-          marginTop: 14,
-          boxShadow: theme.shadow,
-        }}
-      />
-
-      {images.length > 1 && (
-        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', marginTop: 8 }}>
-          {images.map((u, i) => (
-            <img key={i} src={u} alt="" style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 12, background: theme.goldSoft, flex: '0 0 auto' }} />
-          ))}
-        </div>
-      )}
+      <ProductGallery images={images} video={product.video_url || ''} alt={productName} />
 
       <h1 style={{ fontFamily: theme.serif, fontSize: 28, fontWeight: 600, margin: '18px 0 4px' }}>{productName}</h1>
 
@@ -132,9 +154,27 @@ export default async function ProductPage({ params }) {
         {inStock ? t(lang, 'inStock') : t(lang, 'outOfStock')}
       </div>
 
+      <div
+        style={{
+          marginTop: 10,
+          display: 'inline-block',
+          background: theme.goldSoft,
+          borderRadius: 999,
+          padding: '6px 14px',
+          fontSize: 13,
+        }}
+      >
+        🚚{' '}
+        {ar
+          ? `توصيل مجاني للطلبات فوق ${money(lang, FREE_DELIVERY_FROM)}`
+          : `Free delivery on orders over ${money(lang, FREE_DELIVERY_FROM)}`}
+      </div>
+
       {product.description && (
         <p style={{ lineHeight: 1.7, color: '#3a362f', marginTop: 14 }}>{product.description}</p>
       )}
+
+      <SizeGuide guide={product.size_guide} modelInfo={product.model_info} lang={lang} />
 
       <AddToCart
         product={{
