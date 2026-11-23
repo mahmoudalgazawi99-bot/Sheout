@@ -75,6 +75,7 @@ export default async function AdminHome() {
           alert={chatCount > 0}
         />
         <MenuCard href="/admin/settlements" icon="💰" title="التسويات" sub="نقد المناديب ومستحقات المحلات" />
+        <MenuCard href="/admin/scorecards" icon="🏅" title="أداء المحلات" sub="العلامات والاتفاقية" />
         <MenuCard href="/admin/analytics" icon="📊" title="التحليلات" sub="المبيعات والأداء" />
         <MenuCard
           href="/admin/issues"
