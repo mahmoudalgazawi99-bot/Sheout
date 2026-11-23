@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { getStoreSession } from '@/lib/storeauth';
+import { hasAccepted } from '@/lib/agreement';
 import AutoRefresh from '@/components/autorefresh';
 import { OrderCard, chipStyle, HISTORY_LABEL } from '@/components/storeparts';
 import { theme } from '@/lib/theme';
@@ -27,6 +28,7 @@ const DONE = ['picked_up', 'delivered', 'cancelled'];
 export default async function StoreOrdersPage({ searchParams }) {
   const account = await getStoreSession();
   if (!account) redirect('/store/login');
+  if (!(await hasAccepted(account.store_id))) redirect('/store/agreement');
 
   const sp = await searchParams;
   const rawTab = Array.isArray(sp?.tab) ? sp.tab[0] : sp?.tab;
