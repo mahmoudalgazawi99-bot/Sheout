@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { theme } from '@/lib/theme';
 import { t } from '@/lib/i18n';
+import { PRESETS } from '@/lib/sizeguide';
 
 const CATS = ['Women', 'Men', 'Kids', 'Shoes', 'Sports', 'Accessories'];
 const TOPICS = [
@@ -14,18 +15,21 @@ const TOPICS = [
   ['other', 'أخرى'],
 ];
 
-function shrink(file) {
+function shrink(file, maxDim = 1000, quality = 0.72) {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const img = new Image();
     img.onload = () => {
-      const scale = Math.min(1, 1000 / Math.max(img.width, img.height));
+      const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
       const canvas = document.createElement('canvas');
       canvas.width = Math.round(img.width * scale);
       canvas.height = Math.round(img.height * scale);
-      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       URL.revokeObjectURL(url);
-      resolve(canvas.toDataURL('image/jpeg', 0.72));
+      resolve(canvas.toDataURL('image/jpeg', quality));
     };
     img.onerror = () => {
       URL.revokeObjectURL(url);
@@ -73,17 +77,29 @@ const primary = (busy) => ({
   cursor: 'pointer',
 });
 
-function ImagePicker({ images, setImages }) {
+const chipBtn = (active) => ({
+  padding: '6px 12px',
+  borderRadius: 999,
+  fontSize: 13,
+  border: `1px solid ${active ? theme.ink : theme.line}`,
+  background: active ? theme.ink : theme.card,
+  color: active ? theme.gold : theme.ink,
+  cursor: 'pointer',
+});
+
+const cellH = { padding: '6px 4px', fontSize: 12, textAlign: 'center', color: theme.muted };
+
+function ImagePicker({ images, setImages, max = 3, big = false }) {
   async function onPick(e) {
-    const files = Array.from(e.target.files || []).slice(0, 3 - images.length);
+    const files = Array.from(e.target.files || []).slice(0, max - images.length);
     e.target.value = '';
     const out = [];
     for (const f of files) {
       try {
-        out.push(await shrink(f));
+        out.push(await shrink(f, big ? 1100 : 1000, 0.72));
       } catch {}
     }
-    setImages([...images, ...out].slice(0, 3));
+    setImages([...images, ...out].slice(0, max));
   }
 
   return (
@@ -116,7 +132,7 @@ function ImagePicker({ images, setImages }) {
             </button>
           </div>
         ))}
-        {images.length < 3 && (
+        {images.length < max && (
           <label
             style={{
               display: 'inline-block',
@@ -127,7 +143,7 @@ function ImagePicker({ images, setImages }) {
               cursor: 'pointer',
             }}
           >
-            + صورة
+            + صورة ({images.length}/{max})
             <input type="file" accept="image/*" multiple onChange={onPick} style={{ display: 'none' }} />
           </label>
         )}
@@ -152,21 +168,57 @@ export function StoreComposer() {
     sizes: '',
     colors: '',
     description: '',
+    model_info: '',
   });
+  const [preset, setPreset] = useState('top');
+  const [gv, setGv] = useState({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [ok, setOk] = useState('');
 
   const set = (k) => (e) => setPf({ ...pf, [k]: e.target.value });
+  const sizeList = pf.sizes
+    .split(/[,،]/)
+    .map((x) => x.trim())
+    .filter(Boolean)
+    .slice(0, 12);
+  const cols = PRESETS[preset].cols;
+
+  function setCell(size, k, val) {
+    setGv((g) => {
+      const row = (g[size] || cols.map(() => '')).slice();
+      row[k] = val;
+      return { ...g, [size]: row };
+    });
+  }
+
+  function buildGuide() {
+    const rows = sizeList
+      .map((s) => ({ size: s, v: cols.map((_, k) => (gv[s] && gv[s][k]) || '') }))
+      .filter((r) => r.v.some((x) => x));
+    return rows.length > 0 ? { unit: 'cm', cols, rows } : null;
+  }
 
   async function send() {
-    setBusy(true);
     setError('');
     setOk('');
+
+    if (mode === 'product') {
+      if (images.length === 0) {
+        setError('أضف صورة واحدة على الأقل للمنتج');
+        return;
+      }
+      if (images.reduce((s, x) => s + x.length, 0) > 3400000) {
+        setError('حجم الصور كبير بالمجموع. قلّل عددها أو جرّب صور أصغر');
+        return;
+      }
+    }
+
+    setBusy(true);
     const body =
       mode === 'text'
         ? { kind: 'text', topic, body: text, images }
-        : { kind: 'product_request', payload: pf, images };
+        : { kind: 'product_request', payload: { ...pf, size_guide: buildGuide() }, images };
     const r = await post('/api/store/chat', body);
     setBusy(false);
     if (!r.ok) {
@@ -175,7 +227,10 @@ export function StoreComposer() {
     }
     setText('');
     setImages([]);
-    if (mode === 'product') setPf({ ...pf, name_ar: '', name_en: '', price: '', sale_price: '', quantity: '', sizes: '', colors: '', description: '' });
+    if (mode === 'product') {
+      setPf({ ...pf, name_ar: '', name_en: '', price: '', sale_price: '', quantity: '', sizes: '', colors: '', description: '', model_info: '' });
+      setGv({});
+    }
     setOk(mode === 'text' ? 'تم الإرسال' : 'وصل طلب المنتج للإدارة');
     router.refresh();
   }
@@ -203,7 +258,14 @@ export function StoreComposer() {
       }}
     >
       <div style={{ display: 'flex', gap: 8 }}>
-        <button type="button" onClick={() => setMode('text')} style={tab(mode === 'text')}>
+        <button
+          type="button"
+          onClick={() => {
+            setMode('text');
+            setImages((im) => im.slice(0, 3));
+          }}
+          style={tab(mode === 'text')}
+        >
           رسالة
         </button>
         <button type="button" onClick={() => setMode('product')} style={tab(mode === 'product')}>
@@ -247,6 +309,71 @@ export function StoreComposer() {
           <input value={pf.quantity} onChange={set('quantity')} placeholder="الكمية المتوفرة *" type="number" inputMode="numeric" dir="ltr" style={field} />
           <input value={pf.sizes} onChange={set('sizes')} placeholder="المقاسات مفصولة بفاصلة (S, M, L)" dir="ltr" style={field} />
           <input value={pf.colors} onChange={set('colors')} placeholder="الألوان مفصولة بفاصلة (Black, Beige)" dir="ltr" style={field} />
+
+          {sizeList.length > 0 && (
+            <div style={{ marginTop: 12, padding: 10, border: `1px dashed ${theme.line}`, borderRadius: 12 }}>
+              <div style={{ fontWeight: 700, fontSize: 14 }}>📏 دليل المقاسات (اختياري، بالسم)</div>
+              <div style={{ fontSize: 12, color: theme.muted, marginTop: 4 }}>
+                اختار نوع القطعة وعبّي قياس كل مقاس. بيقلل المرتجعات.
+              </div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                {Object.entries(PRESETS).map(([k, p]) => (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => {
+                      setPreset(k);
+                      setGv({});
+                    }}
+                    style={chipBtn(preset === k)}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+              <div style={{ overflowX: 'auto', marginTop: 8 }}>
+                <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+                  <thead>
+                    <tr>
+                      <th style={cellH}>المقاس</th>
+                      {cols.map((c) => (
+                        <th key={c} style={cellH}>
+                          {c}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sizeList.map((s) => (
+                      <tr key={s}>
+                        <td style={{ ...cellH, fontWeight: 700, color: theme.ink }}>{s}</td>
+                        {cols.map((_, k) => (
+                          <td key={k} style={{ padding: 3 }}>
+                            <input
+                              value={(gv[s] && gv[s][k]) || ''}
+                              onChange={(e) => setCell(s, k, e.target.value)}
+                              inputMode="text"
+                              dir="ltr"
+                              placeholder="—"
+                              style={{ ...field, marginTop: 0, padding: '8px 6px', width: 72, textAlign: 'center' }}
+                            />
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          <input
+            value={pf.model_info}
+            onChange={set('model_info')}
+            maxLength={160}
+            placeholder="العارضة: طولها 175 سم وبتلبس مقاس M (اختياري)"
+            style={field}
+          />
           <textarea
             value={pf.description}
             rows={3}
@@ -258,7 +385,12 @@ export function StoreComposer() {
         </div>
       )}
 
-      <ImagePicker images={images} setImages={setImages} />
+      <ImagePicker images={images} setImages={setImages} max={mode === 'product' ? 6 : 3} big={mode === 'product'} />
+      {mode === 'product' && (
+        <div style={{ fontSize: 12, color: theme.muted, marginTop: 6, lineHeight: 1.7 }}>
+          الصور بتبيع المنتج: أضف 3 على الأقل (وجه، ظهر، تفصيل)، ولحد 6. صورة واحدة على الأقل مطلوبة.
+        </div>
+      )}
 
       <button type="button" onClick={send} disabled={busy} style={primary(busy)}>
         {busy ? 'جارٍ الإرسال...' : mode === 'text' ? 'إرسال' : 'إرسال طلب المنتج'}
