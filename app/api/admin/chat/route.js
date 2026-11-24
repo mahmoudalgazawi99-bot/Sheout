@@ -4,6 +4,7 @@ import { isAdmin } from '@/lib/adminauth';
 import { sendToAccounts } from '@/lib/push';
 import { uploadImages } from '@/lib/chatimages';
 import { cleanGuide } from '@/lib/sizeguide';
+import { comboList, splitQuantity } from '@/lib/variants';
 
 const fail = (message, status = 400) => NextResponse.json({ error: message }, { status });
 
@@ -126,7 +127,15 @@ export async function POST(request) {
       .select('id, product_no')
       .single();
 
-    if (error || !product) return fail('تعذّر إنشاء المنتج، تأكد من البيانات ومن أمر القاعدة السابق', 500);
+    if (error || !product) return fail('تعذّر إنشاء المنتج، تأكد من البيانات ومن أوامر القاعدة السابقة', 500);
+
+    try {
+      const combos = comboList(p.sizes, p.colors);
+      const parts = splitQuantity(quantity, combos.length);
+      await supabaseAdmin
+        .from('product_variants')
+        .insert(combos.map((c, i) => ({ product_id: product.id, size: c.size, color: c.color, quantity: parts[i] })));
+    } catch {}
 
     await supabaseAdmin
       .from('store_messages')
