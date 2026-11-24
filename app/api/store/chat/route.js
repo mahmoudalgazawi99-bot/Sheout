@@ -4,6 +4,7 @@ import { getStoreSession } from '@/lib/storeauth';
 import { sendToAdmins } from '@/lib/push';
 import { isLimited } from '@/lib/ratelimit';
 import { uploadImages } from '@/lib/chatimages';
+import { cleanGuide } from '@/lib/sizeguide';
 
 const TOPICS = ['stock', 'price', 'payout', 'order', 'other'];
 const CATS = ['Women', 'Men', 'Kids', 'Shoes', 'Sports', 'Accessories'];
@@ -65,6 +66,7 @@ export async function POST(request) {
     if (!Number.isFinite(price) || price <= 0 || price > 10000) return fail('اكتب سعر صحيح', 400);
     if (sale !== null && (!Number.isFinite(sale) || sale <= 0 || sale >= price)) return fail('السعر بعد التخفيض لازم يكون أقل من السعر', 400);
     if (!Number.isInteger(quantity) || quantity < 0 || quantity > 9999) return fail('اكتب كمية صحيحة', 400);
+    if (!Array.isArray(body.images) || body.images.length === 0) return fail('أضف صورة واحدة على الأقل للمنتج', 400);
 
     row = {
       ...row,
@@ -80,6 +82,8 @@ export async function POST(request) {
         sizes: list(p.sizes),
         colors: list(p.colors),
         description: String(p.description || '').trim().slice(0, 600),
+        model_info: String(p.model_info || '').trim().slice(0, 160),
+        size_guide: cleanGuide(p.size_guide),
       },
     };
     pushText = `طلب منتج جديد: ${name_ar}`;
@@ -87,7 +91,7 @@ export async function POST(request) {
 
   let images = [];
   try {
-    images = await uploadImages(`store-${account.store_id}`, body.images);
+    images = await uploadImages(`store-${account.store_id}`, body.images, kind === 'product_request' ? 6 : 3);
   } catch (e) {
     return fail(e.message || 'تعذّر رفع الصورة', 400);
   }
