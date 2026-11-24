@@ -100,18 +100,45 @@ export async function POST(request) {
 
   if (productsError || !products) return bad('Could not verify your cart', 400);
 
+  const { data: variantRows } = await supabaseAdmin
+    .from('product_variants')
+    .select('product_id, size, color, quantity')
+    .in('product_id', ids);
+
+  const variantsByProduct = {};
+  (variantRows ?? []).forEach((v) => {
+    if (!variantsByProduct[v.product_id]) variantsByProduct[v.product_id] = [];
+    variantsByProduct[v.product_id].push(v);
+  });
+
   const byId = new Map(products.map((p) => [p.id, p]));
   const qtyByProduct = {};
+  const qtyByVariant = {};
 
   for (const l of lines) {
     const p = byId.get(l.productId);
     if (!p || p.status !== 'active') {
       return bad('A product in your cart is no longer available');
     }
-    qtyByProduct[l.productId] = (qtyByProduct[l.productId] || 0) + l.qty;
-    if (qtyByProduct[l.productId] > Number(p.quantity)) {
-      return bad(`Not enough stock for ${p.name}`);
+
+    const vlist = variantsByProduct[l.productId];
+    if (vlist && vlist.length > 0) {
+      const size = l.size || '';
+      const color = l.color || '';
+      const v = vlist.find((x) => (x.size || '') === size && (x.color || '') === color);
+      if (!v) return bad('A product in your cart is no longer available');
+
+      const k = `${l.productId}|${size}|${color}`;
+      if (!qtyByVariant[k]) {
+        qtyByVariant[k] = { product_id: l.productId, size, color, qty: 0, have: Number(v.quantity) || 0 };
+      }
+      qtyByVariant[k].qty += l.qty;
+      if (qtyByVariant[k].qty > qtyByVariant[k].have) return bad(`Not enough stock for ${p.name}`);
+    } else {
+      qtyByProduct[l.productId] = (qtyByProduct[l.productId] || 0) + l.qty;
+      if (qtyByProduct[l.productId] > Number(p.quantity)) return bad(`Not enough stock for ${p.name}`);
     }
+
     l.price = Number(p.sale_price || p.price);
     l.storeId = p.store_id;
   }
@@ -130,123 +157,148 @@ export async function POST(request) {
   let customerId = null;
   let createdCustomer = false;
   let orderId = null;
+  let reserved = null;
 
   async function rollback() {
     if (orderId) await supabaseAdmin.from('orders').delete().eq('id', orderId);
     if (createdCustomer && customerId) await supabaseAdmin.from('customers').delete().eq('id', customerId);
+    if (reserved) {
+      await supabaseAdmin.rpc('release_stock', { p_items: reserved });
+      reserved = null;
+    }
   }
 
-  let customer = null;
-  if (phoneNorm) {
-    const { data: existing } = await supabaseAdmin
-      .from('customers')
-      .select('id, member_no')
-      .eq('phone_norm', phoneNorm)
-      .order('created_at', { ascending: true })
-      .limit(1)
-      .maybeSingle();
-    if (existing) customer = existing;
+  const failOrder = async (message, status = 500) => {
+    await rollback();
+    return bad(message, status);
+  };
+
+  const reserveItems = Object.values(qtyByVariant).map((v) => ({
+    product_id: v.product_id,
+    size: v.size,
+    color: v.color,
+    qty: v.qty,
+  }));
+
+  if (reserveItems.length > 0) {
+    const { error: reserveError } = await supabaseAdmin.rpc('reserve_stock', { p_items: reserveItems });
+    if (reserveError) {
+      const m = /OUT_OF_STOCK:([0-9a-f-]+)/i.exec(String(reserveError.message || ''));
+      if (m) {
+        const p = byId.get(m[1]);
+        return bad(`Not enough stock for ${p ? p.name : 'a product'}`);
+      }
+      return bad('Could not place your order', 500);
+    }
+    reserved = reserveItems;
   }
 
-  if (!customer) {
-    const { data: created, error: customerError } = await supabaseAdmin
-      .from('customers')
-      .insert({ name, phone, phone_norm: phoneNorm })
-      .select('id, member_no')
-      .single();
-    if (customerError || !created) return bad('Could not place your order', 500);
-    customer = created;
-    createdCustomer = true;
-  }
-  customerId = customer.id;
+  try {
+    let customer = null;
+    if (phoneNorm) {
+      const { data: existing } = await supabaseAdmin
+        .from('customers')
+        .select('id, member_no')
+        .eq('phone_norm', phoneNorm)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (existing) customer = existing;
+    }
 
-  const prefix = `${dayKey(new Date()).replace(/-/g, '')}-${customer.member_no}-`;
-  const { count: todayCount } = await supabaseAdmin
-    .from('orders')
-    .select('id', { count: 'exact', head: true })
-    .eq('customer_id', customerId)
-    .like('order_no', `${prefix}%`);
+    if (!customer) {
+      const { data: created, error: customerError } = await supabaseAdmin
+        .from('customers')
+        .insert({ name, phone, phone_norm: phoneNorm })
+        .select('id, member_no')
+        .single();
+      if (customerError || !created) return await failOrder('Could not place your order');
+      customer = created;
+      createdCustomer = true;
+    }
+    customerId = customer.id;
 
-  let seq = (todayCount || 0) + 1;
-  let order = null;
-  for (let attempt = 0; attempt < 5 && !order; attempt++) {
-    const { data, error } = await supabaseAdmin
+    const prefix = `${dayKey(new Date()).replace(/-/g, '')}-${customer.member_no}-`;
+    const { count: todayCount } = await supabaseAdmin
       .from('orders')
-      .insert({
-        customer_id: customerId,
-        order_no: `${prefix}${seq}`,
-        subtotal,
-        delivery_fee: deliveryFee,
-        total,
-        address,
-        notes: notes || null,
-        payment_method: 'cod',
-      })
-      .select('id, order_no')
-      .single();
+      .select('id', { count: 'exact', head: true })
+      .eq('customer_id', customerId)
+      .like('order_no', `${prefix}%`);
 
-    if (!error && data) {
-      order = data;
-    } else if (error && error.code === '23505') {
-      seq += 1;
-    } else {
-      break;
+    let seq = (todayCount || 0) + 1;
+    let order = null;
+    for (let attempt = 0; attempt < 5 && !order; attempt++) {
+      const { data, error } = await supabaseAdmin
+        .from('orders')
+        .insert({
+          customer_id: customerId,
+          order_no: `${prefix}${seq}`,
+          subtotal,
+          delivery_fee: deliveryFee,
+          total,
+          address,
+          notes: notes || null,
+          payment_method: 'cod',
+        })
+        .select('id, order_no')
+        .single();
+
+      if (!error && data) {
+        order = data;
+      } else if (error && error.code === '23505') {
+        seq += 1;
+      } else {
+        break;
+      }
     }
-  }
 
-  if (!order) {
-    await rollback();
-    return bad('Could not place your order', 500);
-  }
-  orderId = order.id;
+    if (!order) return await failOrder('Could not place your order');
+    orderId = order.id;
 
-  const storeIds = Object.keys(groups);
-  const { data: subOrders, error: subError } = await supabaseAdmin
-    .from('sub_orders')
-    .insert(
-      storeIds.map((sid, idx) => ({
-        order_id: orderId,
-        store_id: sid,
-        subtotal: r2(groups[sid].subtotal),
-        part_no: idx + 1,
-        parts_total: storeIds.length,
-      }))
-    )
-    .select('id, store_id');
-  if (subError || !subOrders) {
-    await rollback();
-    return bad('Could not place your order', 500);
-  }
+    const storeIds = Object.keys(groups);
+    const { data: subOrders, error: subError } = await supabaseAdmin
+      .from('sub_orders')
+      .insert(
+        storeIds.map((sid, idx) => ({
+          order_id: orderId,
+          store_id: sid,
+          subtotal: r2(groups[sid].subtotal),
+          part_no: idx + 1,
+          parts_total: storeIds.length,
+        }))
+      )
+      .select('id, store_id');
+    if (subError || !subOrders) return await failOrder('Could not place your order');
 
-  const rows = [];
-  for (const so of subOrders) {
-    for (const l of groups[so.store_id].items) {
-      rows.push({
-        sub_order_id: so.id,
-        product_id: l.productId,
-        quantity: l.qty,
-        price: l.price,
-        size: l.size,
-        color: l.color,
-      });
+    const rows = [];
+    for (const so of subOrders) {
+      for (const l of groups[so.store_id].items) {
+        rows.push({
+          sub_order_id: so.id,
+          product_id: l.productId,
+          quantity: l.qty,
+          price: l.price,
+          size: l.size,
+          color: l.color,
+        });
+      }
     }
+
+    const { error: itemsError } = await supabaseAdmin.from('order_items').insert(rows);
+    if (itemsError) return await failOrder('Could not place your order');
+
+    for (const pid of Object.keys(qtyByProduct)) {
+      const p = byId.get(pid);
+      await supabaseAdmin
+        .from('products')
+        .update({ quantity: Number(p.quantity) - qtyByProduct[pid] })
+        .eq('id', pid);
+    }
+
+    await Promise.all([notifyStores(groups), notifyAdmins(orderId, order.order_no, groups, total)]);
+
+    return NextResponse.json({ orderId, orderNo: order.order_no });
+  } catch {
+    return await failOrder('Could not place your order');
   }
-
-  const { error: itemsError } = await supabaseAdmin.from('order_items').insert(rows);
-  if (itemsError) {
-    await rollback();
-    return bad('Could not place your order', 500);
-  }
-
-  for (const pid of Object.keys(qtyByProduct)) {
-    const p = byId.get(pid);
-    await supabaseAdmin
-      .from('products')
-      .update({ quantity: Number(p.quantity) - qtyByProduct[pid] })
-      .eq('id', pid);
-  }
-
-  await Promise.all([notifyStores(groups), notifyAdmins(orderId, order.order_no, groups, total)]);
-
-  return NextResponse.json({ orderId, orderNo: order.order_no });
 }
