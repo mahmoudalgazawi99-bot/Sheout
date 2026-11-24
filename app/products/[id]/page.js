@@ -101,6 +101,19 @@ export default async function ProductPage({ params }) {
     );
   }
 
+  let variants = [];
+  try {
+    const { data: vr } = await supabaseAdmin
+      .from('product_variants')
+      .select('size, color, quantity')
+      .eq('product_id', id);
+    variants = (vr ?? []).map((v) => ({
+      size: v.size || '',
+      color: v.color || '',
+      quantity: Number(v.quantity) || 0,
+    }));
+  } catch {}
+
   let reviews = [];
   try {
     const { data: rv } = await supabaseAdmin
@@ -187,6 +200,7 @@ export default async function ProductPage({ params }) {
         }}
         sizes={sizes}
         colors={colors}
+        variants={variants}
       />
 
       <div style={{ margin: '30px 0 12px' }}>
