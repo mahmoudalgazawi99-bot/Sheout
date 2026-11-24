@@ -27,12 +27,16 @@ export async function PATCH(request, { params }) {
 
   const { data: current } = await supabaseAdmin
     .from('sub_orders')
-    .select('id, confirmed_at, ready_at, picked_up_at, delivered_at')
+    .select('id, status, confirmed_at, ready_at, picked_up_at, delivered_at')
     .eq('id', id)
     .maybeSingle();
 
   if (!current) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+
+  if (current.status === 'cancelled' && status !== 'cancelled') {
+    return NextResponse.json({ error: 'A cancelled part cannot be reopened' }, { status: 400 });
   }
 
   const { data: updated, error } = await supabaseAdmin
@@ -46,7 +50,13 @@ export async function PATCH(request, { params }) {
     return NextResponse.json({ error: 'Could not update' }, { status: 500 });
   }
 
+  let stockWarning = false;
+  if (status === 'cancelled' && current.status !== 'cancelled') {
+    const { error: stockError } = await supabaseAdmin.rpc('restore_sub_order_stock', { p_sub: id });
+    if (stockError) stockWarning = true;
+  }
+
   const orderStatus = await refreshOrderStatus(updated.order_id);
 
-  return NextResponse.json({ ok: true, orderStatus });
+  return NextResponse.json({ ok: true, orderStatus, stockWarning });
 }
