@@ -15,6 +15,8 @@ const TOPIC_AR = {
 const STATUS_AR = { pending: 'بانتظار المراجعة', approved: 'تم النشر', rejected: 'مرفوض' };
 const STATUS_COLOR = { pending: '#b86a00', approved: '#177a3c', rejected: '#b00' };
 
+const tc = { border: '1px solid rgba(128,128,128,0.45)', padding: '3px 8px', textAlign: 'center' };
+
 function fmt(v) {
   const d = toDate(v);
   return d ? d.toLocaleString('ar-JO', { timeZone: 'Asia/Amman', dateStyle: 'short', timeStyle: 'short' }) : '';
@@ -24,6 +26,7 @@ export function Bubble({ m, viewer, children }) {
   const mine = m.sender === viewer;
   const p = m.payload || {};
   const isProduct = m.kind === 'product_request';
+  const guide = p.size_guide && Array.isArray(p.size_guide.rows) && p.size_guide.rows.length > 0 ? p.size_guide : null;
 
   return (
     <div style={{ display: 'flex', justifyContent: mine ? 'flex-start' : 'flex-end', marginBottom: 10 }}>
@@ -57,6 +60,35 @@ export function Bubble({ m, viewer, children }) {
             </div>
             {p.sizes && p.sizes.length > 0 ? <div>المقاسات: {p.sizes.join('، ')}</div> : null}
             {p.colors && p.colors.length > 0 ? <div>الألوان: {p.colors.join('، ')}</div> : null}
+            {p.model_info ? <div>📏 {p.model_info}</div> : null}
+            {guide ? (
+              <div style={{ overflowX: 'auto', marginTop: 6 }}>
+                <table style={{ borderCollapse: 'collapse', fontSize: 12 }}>
+                  <thead>
+                    <tr>
+                      <th style={tc}>المقاس</th>
+                      {(guide.cols || []).map((c, i) => (
+                        <th key={i} style={tc}>
+                          {c}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {guide.rows.map((r, i) => (
+                      <tr key={i}>
+                        <td style={{ ...tc, fontWeight: 700 }}>{r.size}</td>
+                        {(guide.cols || []).map((_, k) => (
+                          <td key={k} style={tc}>
+                            {(r.v && r.v[k]) || '—'}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
             {p.description ? <div style={{ opacity: 0.9 }}>{p.description}</div> : null}
             <div style={{ marginTop: 4, fontWeight: 700, color: mine ? theme.gold : STATUS_COLOR[m.status] || theme.ink }}>
               {STATUS_AR[m.status] || ''}
