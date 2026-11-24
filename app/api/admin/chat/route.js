@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { isAdmin } from '@/lib/adminauth';
 import { sendToAccounts } from '@/lib/push';
 import { uploadImages } from '@/lib/chatimages';
+import { cleanGuide } from '@/lib/sizeguide';
 
 const fail = (message, status = 400) => NextResponse.json({ error: message }, { status });
 
@@ -37,7 +38,7 @@ export async function POST(request) {
 
     let images = [];
     try {
-      images = await uploadImages(`admin-${storeId}`, body.images);
+      images = await uploadImages(`admin-${storeId}`, body.images, 3);
     } catch (e) {
       return fail(e.message || 'تعذّر رفع الصورة');
     }
@@ -118,12 +119,14 @@ export async function POST(request) {
         colors: p.colors || [],
         quantity,
         images: msg.images || [],
+        size_guide: cleanGuide(p.size_guide),
+        model_info: p.model_info ? String(p.model_info).slice(0, 160) : null,
         status: 'active',
       })
       .select('id, product_no')
       .single();
 
-    if (error || !product) return fail('تعذّر إنشاء المنتج، تأكد من البيانات', 500);
+    if (error || !product) return fail('تعذّر إنشاء المنتج، تأكد من البيانات ومن أمر القاعدة السابق', 500);
 
     await supabaseAdmin
       .from('store_messages')
