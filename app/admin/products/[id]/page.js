@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { isAdmin } from '@/lib/adminauth';
 import ProductEditor from '@/components/producteditor';
+import StockEditor from '@/components/stockeditor';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,6 +36,17 @@ export default async function AdminProductPage({ params }) {
     );
   }
 
+  let variants = [];
+  try {
+    const { data: vr } = await supabaseAdmin
+      .from('product_variants')
+      .select('id, size, color, quantity')
+      .eq('product_id', id)
+      .order('size', { ascending: true })
+      .order('color', { ascending: true });
+    variants = vr ?? [];
+  } catch {}
+
   return (
     <main dir="rtl" lang="ar" style={wrap}>
       <Link href="/admin/products" style={{ color: '#111', textDecoration: 'none', fontSize: 14 }}>
@@ -47,6 +59,8 @@ export default async function AdminProductPage({ params }) {
           فتح صفحة المنتج
         </Link>
       </div>
+
+      <StockEditor productId={p.id} initial={variants} />
 
       <ProductEditor
         product={{
