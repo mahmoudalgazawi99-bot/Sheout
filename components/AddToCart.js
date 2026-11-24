@@ -7,23 +7,47 @@ import { theme } from '@/lib/theme';
 import { useLang } from '@/components/LangProvider';
 import { t, sizeLabel, colorLabel } from '@/lib/i18n';
 
-export default function AddToCart({ product, sizes, colors }) {
+export default function AddToCart({ product, sizes, colors, variants = [] }) {
   const lang = useLang();
   const [size, setSize] = useState('');
   const [color, setColor] = useState('');
   const [message, setMessage] = useState('');
   const [added, setAdded] = useState(false);
 
+  const hasVariants = variants.length > 0;
   const inStock = Number(product.quantity) > 0;
 
-  const chip = (active) => ({
+  const qtyOf = (s, c) => {
+    const v = variants.find((x) => x.size === (s || '') && x.color === (c || ''));
+    return v ? v.quantity : 0;
+  };
+
+  const sizeOk = (s) => {
+    if (!hasVariants) return true;
+    if (colors.length > 0) {
+      return color ? qtyOf(s, color) > 0 : variants.some((v) => v.size === s && v.quantity > 0);
+    }
+    return qtyOf(s, '') > 0;
+  };
+
+  const colorOk = (c) => {
+    if (!hasVariants) return true;
+    if (sizes.length > 0) {
+      return size ? qtyOf(size, c) > 0 : variants.some((v) => v.color === c && v.quantity > 0);
+    }
+    return qtyOf('', c) > 0;
+  };
+
+  const chip = (active, disabled) => ({
     border: active ? `2px solid ${theme.ink}` : `1px solid ${theme.line}`,
     borderRadius: 999,
     padding: active ? '7px 15px' : '8px 16px',
     fontSize: 13,
     background: active ? theme.ink : theme.card,
     color: active ? theme.bg : theme.ink,
-    cursor: 'pointer',
+    cursor: disabled ? 'not-allowed' : 'pointer',
+    opacity: disabled ? 0.4 : 1,
+    textDecoration: disabled ? 'line-through' : 'none',
   });
 
   const label = { fontFamily: theme.serif, fontSize: 16, fontWeight: 600 };
@@ -37,6 +61,11 @@ export default function AddToCart({ product, sizes, colors }) {
       setMessage(t(lang, 'chooseColor'));
       return;
     }
+    const maxQty = hasVariants ? qtyOf(size, color) : Number(product.quantity) || 99;
+    if (maxQty <= 0) {
+      setMessage(t(lang, 'outOfStock'));
+      return;
+    }
     addToCart({
       productId: product.id,
       name: product.name,
@@ -46,7 +75,7 @@ export default function AddToCart({ product, sizes, colors }) {
       size,
       color,
       qty: 1,
-      maxQty: Number(product.quantity) || 99,
+      maxQty,
     });
     setMessage('');
     setAdded(true);
@@ -58,11 +87,24 @@ export default function AddToCart({ product, sizes, colors }) {
         <div style={{ marginTop: 16 }}>
           <div style={label}>{t(lang, 'sizes')}</div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
-            {sizes.map((s) => (
-              <button key={s} type="button" onClick={() => { setSize(s); setAdded(false); }} style={chip(size === s)}>
-                {sizeLabel(lang, s)}
-              </button>
-            ))}
+            {sizes.map((s) => {
+              const ok = sizeOk(s);
+              return (
+                <button
+                  key={s}
+                  type="button"
+                  disabled={!ok}
+                  title={ok ? undefined : lang === 'ar' ? 'نفد' : 'Sold out'}
+                  onClick={() => {
+                    setSize(s);
+                    setAdded(false);
+                  }}
+                  style={chip(size === s, !ok)}
+                >
+                  {sizeLabel(lang, s)}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
@@ -71,11 +113,24 @@ export default function AddToCart({ product, sizes, colors }) {
         <div style={{ marginTop: 16 }}>
           <div style={label}>{t(lang, 'colors')}</div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
-            {colors.map((c) => (
-              <button key={c} type="button" onClick={() => { setColor(c); setAdded(false); }} style={chip(color === c)}>
-                {colorLabel(lang, c)}
-              </button>
-            ))}
+            {colors.map((c) => {
+              const ok = colorOk(c);
+              return (
+                <button
+                  key={c}
+                  type="button"
+                  disabled={!ok}
+                  title={ok ? undefined : lang === 'ar' ? 'نفد' : 'Sold out'}
+                  onClick={() => {
+                    setColor(c);
+                    setAdded(false);
+                  }}
+                  style={chip(color === c, !ok)}
+                >
+                  {colorLabel(lang, c)}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
@@ -105,7 +160,9 @@ export default function AddToCart({ product, sizes, colors }) {
       {added && (
         <p style={{ fontSize: 14 }}>
           {t(lang, 'addedToCart')}{' '}
-          <Link href="/cart" style={{ color: theme.gold, fontWeight: 600 }}>{t(lang, 'viewCart')}</Link>
+          <Link href="/cart" style={{ color: theme.gold, fontWeight: 600 }}>
+            {t(lang, 'viewCart')}
+          </Link>
         </p>
       )}
     </div>
