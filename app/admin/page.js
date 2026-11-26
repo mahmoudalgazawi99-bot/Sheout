@@ -58,7 +58,7 @@ export default async function AdminHome() {
 
       <MenuGrid>
         <MenuCard href="/admin/orders" icon="📦" title="الطلبات" sub="الطلبات الحالية والبحث" badge={activeCount} />
-        <MenuCard href="/admin/products" icon="👗" title="المنتجات" sub="صور ومقاسات وفيديو" />
+        <MenuCard href="/admin/products" icon="👗" title="المنتجات" sub="صور ومقاسات ومخزون" />
         <MenuCard href="/admin/warehouse" icon="🏭" title="متابعة المستودع" sub="المراحل والتأخير" />
         <MenuCard
           href="/admin/merge"
@@ -98,6 +98,8 @@ export default async function AdminHome() {
         <MenuCard href="/admin/reviews" icon="⭐" title="تعليقات المنتجات" sub="إظهار وإخفاء" />
         <MenuCard href="/admin/couriers" icon="🛵" title="المناديب والمستودع" sub="الحسابات والأدوار" />
         <MenuCard href="/admin/stores" icon="🏪" title="حسابات المحلات" sub="يوزر وكلمة سر لكل محل" />
+        <MenuCard href="/admin/audit" icon="🧾" title="سجل التدقيق" sub="التغييرات الحساسة" />
+        <MenuCard href="/admin/backup" icon="💾" title="نسخة البيانات" sub="تنزيل يدوي (JSON)" />
       </MenuGrid>
 
       <details style={{ marginTop: 20 }}>
