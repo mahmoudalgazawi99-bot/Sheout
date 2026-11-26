@@ -78,6 +78,7 @@ export default async function AdminHome() {
         <MenuCard href="/admin/settlements" icon="💰" title="التسويات" sub="نقد المناديب ومستحقات المحلات" />
         <MenuCard href="/admin/scorecards" icon="🏅" title="أداء المحلات" sub="العلامات والاتفاقية" />
         <MenuCard href="/admin/analytics" icon="📊" title="التحليلات" sub="المبيعات والأداء" />
+        <MenuCard href="/admin/export" icon="📤" title="تصدير الطلبات" sub="ملف CSV للمقاييس" />
         <MenuCard
           href="/admin/issues"
           icon="⚠️"
