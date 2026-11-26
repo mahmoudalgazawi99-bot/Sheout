@@ -3,8 +3,11 @@ import { redirect } from 'next/navigation';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { isAdmin } from '@/lib/adminauth';
 import StatusSelect from '@/components/statusselect';
+import OrderWhatsApp from '@/components/orderwhatsapp';
 import { tagLabel } from '@/lib/feedback';
 import { ago } from '@/lib/contact';
+import { waBase, orderMessages } from '@/lib/whatsapp';
+import { SITE_URL } from '@/lib/site';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,9 +21,7 @@ export default async function AdminOrderPage({ params }) {
 
   const { data: order } = await supabaseAdmin
     .from('orders')
-    .select(
-      'id, order_no, subtotal, delivery_fee, total, status, address, notes, payment_method, created_at, customers(id, name, phone, member_no, phone_norm)'
-    )
+    .select('*, customers(id, name, phone, member_no, phone_norm)')
     .eq('id', id)
     .maybeSingle();
 
@@ -72,6 +73,13 @@ export default async function AdminOrderPage({ params }) {
   } catch {}
 
   const orderNo = order.order_no || String(order.id).slice(0, 8).toUpperCase();
+  const messages = orderMessages({
+    name: cust ? cust.name : '',
+    orderNo,
+    total: order.total,
+    address: order.address,
+    link: `${SITE_URL}/order/${order.id}`,
+  });
 
   return (
     <main style={wrap}>
@@ -92,10 +100,25 @@ export default async function AdminOrderPage({ params }) {
           ) : null}
         </div>
         <div>Address: {order.address}</div>
+        {order.map_url ? (
+          <div>
+            Map:{' '}
+            <a href={order.map_url} target="_blank" rel="noreferrer" style={{ color: '#111' }}>
+              open customer location
+            </a>
+          </div>
+        ) : null}
         {order.notes && <div>Notes: {order.notes}</div>}
         <div>Payment: {order.payment_method === 'cod' ? 'Cash on delivery' : order.payment_method}</div>
         <div>Order status: <b>{order.status}</b></div>
       </div>
+
+      <OrderWhatsApp
+        waBase={waBase(cust ? cust.phone : '')}
+        messages={messages}
+        orderId={order.id}
+        confirmedAt={order.confirmed_at ? when(order.confirmed_at) : ''}
+      />
 
       {notes.length > 0 && (
         <div
