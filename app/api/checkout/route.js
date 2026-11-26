@@ -5,6 +5,7 @@ import { clientKey, isLimited } from '@/lib/ratelimit';
 import { dayKey } from '@/lib/analytics';
 import { normalizePhone } from '@/lib/phone';
 import { deliveryFeeFor } from '@/lib/shipping';
+import { SERVED, cleanMapUrl, composeAddress } from '@/lib/address';
 
 const r2 = (n) => Math.round(n * 100) / 100;
 const bad = (message, status = 400) => NextResponse.json({ error: message }, { status });
@@ -64,9 +65,20 @@ export async function POST(request) {
 
   const name = String(body.name || '').trim().slice(0, 100);
   const phone = String(body.phone || '').trim().slice(0, 30);
-  const address = String(body.address || '').trim().slice(0, 300);
+  const governorate = String(body.governorate || '').trim().slice(0, 30);
+  const area = String(body.area || '').trim().slice(0, 80);
+  const street = String(body.street || '').trim().slice(0, 160);
+  const landmark = String(body.landmark || '').trim().slice(0, 100);
+  const mapUrl = cleanMapUrl(body.mapUrl);
   const notes = String(body.notes || '').trim().slice(0, 500);
   const items = Array.isArray(body.items) ? body.items : [];
+
+  const structured = !!(governorate && area && street);
+  let address = String(body.address || '').trim().slice(0, 300);
+  if (structured) {
+    if (!SERVED.includes(governorate)) return bad('Delivery is not available in this governorate yet');
+    address = composeAddress({ governorate, area, street, landmark });
+  }
 
   if (!name || !phone || !address) return bad('Please fill in name, phone and address');
   if (items.length === 0 || items.length > 30) return bad('Your cart is empty');
@@ -225,9 +237,13 @@ export async function POST(request) {
       .eq('customer_id', customerId)
       .like('order_no', `${prefix}%`);
 
+    let extra = structured
+      ? { governorate, area, landmark: landmark || null, map_url: mapUrl }
+      : { map_url: mapUrl };
+
     let seq = (todayCount || 0) + 1;
     let order = null;
-    for (let attempt = 0; attempt < 5 && !order; attempt++) {
+    for (let attempt = 0; attempt < 6 && !order; attempt++) {
       const { data, error } = await supabaseAdmin
         .from('orders')
         .insert({
@@ -239,6 +255,7 @@ export async function POST(request) {
           address,
           notes: notes || null,
           payment_method: 'cod',
+          ...extra,
         })
         .select('id, order_no')
         .single();
@@ -247,6 +264,8 @@ export async function POST(request) {
         order = data;
       } else if (error && error.code === '23505') {
         seq += 1;
+      } else if (error && /column/i.test(String(error.message)) && Object.keys(extra).length > 0) {
+        extra = {};
       } else {
         break;
       }
