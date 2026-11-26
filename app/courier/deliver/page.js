@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { getCourierSession, canPickup } from '@/lib/courierauth';
 import { loadDelivery } from '@/lib/courierdata';
 import { TakeButton, DeliverButton } from '@/components/courierorderactions';
@@ -14,6 +15,34 @@ export default async function CourierDeliverPage() {
   if (!canPickup(account.role)) redirect('/courier');
 
   const { available, mine } = await loadDelivery(account.id);
+
+  const mapUrls = {};
+  if (mine.length > 0) {
+    try {
+      const { data } = await supabaseAdmin
+        .from('orders')
+        .select('id, map_url')
+        .in(
+          'id',
+          mine.map((e) => e.o.id)
+        );
+      (data ?? []).forEach((r) => {
+        if (r.map_url) mapUrls[r.id] = r.map_url;
+      });
+    } catch {}
+  }
+
+  const pill = {
+    display: 'inline-block',
+    border: `1px solid ${theme.ink}`,
+    borderRadius: 999,
+    padding: '6px 14px',
+    fontSize: 13,
+    color: theme.ink,
+    textDecoration: 'none',
+    background: theme.goldSoft,
+    fontWeight: 600,
+  };
 
   return (
     <main style={{ maxWidth: 720, margin: '0 auto', padding: 16 }}>
@@ -43,7 +72,14 @@ export default async function CourierDeliverPage() {
             <div>العنوان: {o.address}</div>
             {o.notes ? <div>ملاحظات: {o.notes}</div> : null}
           </div>
-          <Contact phone={o.customers ? o.customers.phone : ''} mapQuery={o.address} mapLabel="موقع الزبون" />
+          <Contact phone={o.customers ? o.customers.phone : ''} mapQuery={o.address} mapLabel="بحث بالعنوان" />
+          {mapUrls[o.id] && (
+            <div style={{ marginTop: 8 }}>
+              <a href={mapUrls[o.id]} target="_blank" rel="noreferrer" style={pill}>
+                📍 موقع الزبون الدقيق
+              </a>
+            </div>
+          )}
 
           <div style={{ marginTop: 10, borderTop: `1px solid ${theme.line}`, paddingTop: 6 }}>
             {subs.map((s) => (
